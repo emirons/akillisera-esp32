@@ -20,6 +20,7 @@
 #include "config.h"
 #include "control_logic.h"
 #include "actuators.h"
+#include "web_ui.h"
 #include "secrets.h"
 
 // loop -> API'ye taşınan anlık durum (JSON /api/durum için).
@@ -95,7 +96,8 @@ inline bool govdeyiAl(JsonDocument& doc) {
 // --- Uç nokta işleyicileri ---
 inline void handleRoot() {
   corsBasliklari();
-  s_server.send(200, F("text/html"), F("<h1>Akilli Sera</h1><p>Web arayuzu Faz 7'de gelecek.</p>"));
+  // send_P: HTML'i PROGMEM'den doğrudan servis eder, RAM'e KOPYALAMAZ (heap tasarrufu).
+  s_server.send_P(200, "text/html", INDEX_HTML);
 }
 
 inline void handleDurum() {
@@ -112,6 +114,7 @@ inline void handleDurum() {
   doc["alarm"]         = s_durum.alarm;
   doc["otomatik"]      = s_otomatik;
   doc["dhtGecerli"]    = s_durum.dhtGecerli;
+  doc["rssi"]          = WiFi.RSSI();
   doc["calismaSuresi"] = millis();
   String cikti;
   serializeJson(doc, cikti);
