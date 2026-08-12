@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "author": "Kisi B",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+
+    { "type": "wokwi-dht22", "id": "dht", "top": -180, "left": 200, "attrs": {} },
+
+    { "type": "wokwi-lcd1602", "id": "lcd", "top": -300, "left": -40,
+      "attrs": { "pins": "i2c", "address": "0x27" } },
+
+    { "type": "wokwi-potentiometer", "id": "pot_soil", "top": 100, "left": 250,
+      "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "pot_ldr", "top": 220, "left": 250,
+      "attrs": {} },
+
+    { "type": "wokwi-pushbutton", "id": "btn_water", "top": 340, "left": 200,
+      "attrs": { "color": "green" } },
+    { "type": "wokwi-pushbutton", "id": "btn_page", "top": 340, "left": 340,
+      "attrs": { "color": "blue" } },
+
+    { "type": "wokwi-led", "id": "led_green", "top": -60, "left": -180,
+      "attrs": { "color": "green" } },
+    { "type": "wokwi-led", "id": "led_red", "top": 20, "left": -180,
+      "attrs": { "color": "red" } },
+    { "type": "wokwi-led", "id": "led_strip", "top": 100, "left": -180,
+      "attrs": { "color": "white" } },
+    { "type": "wokwi-led", "id": "led_pump", "top": 180, "left": -180,
+      "attrs": { "color": "cyan" } },
+    { "type": "wokwi-led", "id": "led_fan", "top": 260, "left": -180,
+      "attrs": { "color": "yellow" } },
+
+    { "type": "wokwi-resistor", "id": "r_green", "top": -60, "left": -300, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r_red", "top": 20, "left": -300, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r_strip", "top": 100, "left": -300, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r_pump", "top": 180, "left": -300, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r_fan", "top": 260, "left": -300, "attrs": { "value": "220" } },
+
+    { "type": "wokwi-buzzer", "id": "buzzer", "top": 340, "left": -100, "attrs": {} }
+  ],
+  "connections": [
+    [ "esp:3V3", "dht:VCC", "red", [] ],
+    [ "esp:GND.1", "dht:GND", "black", [] ],
+    [ "dht:SDA", "esp:D4", "green", [] ],
+
+    [ "esp:3V3", "lcd:VCC", "red", [] ],
+    [ "esp:GND.1", "lcd:GND", "black", [] ],
+    [ "lcd:SDA", "esp:D21", "blue", [] ],
+    [ "lcd:SCL", "esp:D22", "yellow", [] ],
+
+    [ "esp:3V3", "pot_soil:VCC", "red", [] ],
+    [ "esp:GND.1", "pot_soil:GND", "black", [] ],
+    [ "pot_soil:SIG", "esp:D34", "green", [] ],
+
+    [ "esp:3V3", "pot_ldr:VCC", "red", [] ],
+    [ "esp:GND.1", "pot_ldr:GND", "black", [] ],
+    [ "pot_ldr:SIG", "esp:D35", "green", [] ],
+
+    [ "btn_water:1.l", "esp:D12", "green", [] ],
+    [ "btn_water:2.l", "esp:GND.1", "black", [] ],
+    [ "btn_page:1.l", "esp:D14", "blue", [] ],
+    [ "btn_page:2.l", "esp:GND.1", "black", [] ],
+
+    [ "esp:D2", "r_green:1", "green", [] ],
+    [ "r_green:2", "led_green:A", "green", [] ],
+    [ "led_green:C", "esp:GND.1", "black", [] ],
+
+    [ "esp:D15", "r_red:1", "red", [] ],
+    [ "r_red:2", "led_red:A", "red", [] ],
+    [ "led_red:C", "esp:GND.1", "black", [] ],
+
+    [ "esp:D25", "r_strip:1", "white", [] ],
+    [ "r_strip:2", "led_strip:A", "white", [] ],
+    [ "led_strip:C", "esp:GND.1", "black", [] ],
+
+    [ "esp:D5", "r_pump:1", "cyan", [] ],
+    [ "r_pump:2", "led_pump:A", "cyan", [] ],
+    [ "led_pump:C", "esp:GND.1", "black", [] ],
+
+    [ "esp:D18", "r_fan:1", "orange", [] ],
+    [ "r_fan:2", "led_fan:A", "orange", [] ],
+    [ "led_fan:C", "esp:GND.1", "black", [] ],
+
+    [ "esp:D19", "buzzer:1", "purple", [] ],
+    [ "buzzer:2", "esp:GND.1", "black", [] ]
+  ],
+  "dependencies": {}
+}

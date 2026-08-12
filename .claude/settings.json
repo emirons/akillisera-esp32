@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "in=$(cat); echo \"$in\" | grep -qE '\"file_path\"[^}]*akillisera/[^\"]*\\.(ino|h)\"' && arduino-cli compile --fqbn esp32:esp32:nodemcu-32s --output-dir build akillisera/ 2>&1 | tail -25 || true"
+          }
+        ]
+      }
+    ]
+  }
+}
