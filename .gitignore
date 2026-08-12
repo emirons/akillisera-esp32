@@ -1,0 +1,15 @@
+# Sırlar — asla commit etme
+akillisera/secrets.h
+
+# Derleme çıktıları
+build/
+*.bin
+*.elf
+*.hex
+*.map
+
+# Host test binary
+/tmp/tests
+
+# macOS
+.DS_Store

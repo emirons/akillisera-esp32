@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+firmware = '../build/akillisera.ino.bin'
+elf = '../build/akillisera.ino.elf'
