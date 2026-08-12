@@ -362,6 +362,25 @@ TEST_CASE("metniKirp: bos ve nullptr guvenli") {
   metniKirp(nullptr);   // crash olmamali
 }
 
+// ---------------------------------------------------------------------------
+// 14. Bitkiye özel kontrol — sulamaGerekliYuzde + parametrik fan/alarm
+// ---------------------------------------------------------------------------
+TEST_CASE("sulamaGerekliYuzde: esik altinda kuru -> sula") {
+  CHECK(sulamaGerekliYuzde(39, 40, false) == true);
+  CHECK(sulamaGerekliYuzde(40, 40, false) == false);
+  CHECK(sulamaGerekliYuzde(30, 40, true)  == false);
+}
+TEST_CASE("fanKarari: bitki esikleriyle (lettuce tempHigh 24)") {
+  CHECK(fanKarari(50.0f, 25.0f, false, 70.0f, 55.0f, 24.0f) == true);
+  CHECK(fanKarari(50.0f, 20.0f, true,  70.0f, 55.0f, 24.0f) == false);
+  CHECK(fanKarari(75.0f, 20.0f, false, 70.0f, 55.0f, 24.0f) == true);
+}
+TEST_CASE("alarmKarari: bitki esigiyle") {
+  CHECK(alarmKarari(25.0f, 24.0f) == true);
+  CHECK(alarmKarari(23.0f, 24.0f) == false);
+  CHECK(alarmKarari(36.0f) == true);
+}
+
 TEST_CASE("sayfaSatirlari: SISTEM wifi yok / var") {
   EkranVerisi d = {0, 0, 0, false, 0, false, 0, false, false, 0};
   char l1[17], l2[17];

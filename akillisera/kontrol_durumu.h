@@ -5,12 +5,15 @@
 
 #include "control_logic.h"
 
-// Fan ve LED BAĞIMSIZ oto/manuel.
-static bool g_fanOto = true, g_ledOto = true, g_manuelFan = false;
+// Fan, LED ve SULAMA bağımsız oto/manuel.
+// Sulama: oto=bitkinin optimum saatleri + toprak eşiği; manuel=kullanıcı planı + buton.
+static bool g_fanOto = true, g_ledOto = true, g_sulamaOto = true, g_manuelFan = false;
 static int  g_manuelLed = 0;
 
 inline bool kdFanOto()    { return g_fanOto; }
 inline bool kdLedOto()    { return g_ledOto; }
+inline bool kdSulamaOto() { return g_sulamaOto; }
+inline void kdSulamaOtoAyarla(bool oto) { g_sulamaOto = oto; }
 inline bool kdManuelFan() { return g_manuelFan; }
 inline int  kdManuelLed() { return g_manuelLed; }
 inline void kdFanElle(bool acik)     { g_manuelFan = acik; g_fanOto = false; }

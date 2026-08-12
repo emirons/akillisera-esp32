@@ -118,10 +118,20 @@ inline bool butonBasildi(const ButonDurumu& d) {
   return d.kararliDurum == false;
 }
 
-// 3. Fan histerezisi. Bant içindeyken önceki durum korunur (röle çatırdaması önlenir).
-inline bool fanKarari(float nem, float sicaklik, bool oncekiDurum) {
-  if (nem > HUM_HIGH_THRESHOLD || sicaklik > TEMP_HIGH_THRESHOLD) return true;
-  if (nem < HUM_LOW_THRESHOLD  && sicaklik < TEMP_HIGH_THRESHOLD) return false;
+// 2c. Toprak %'ye göre sulama gerekli mi (bitkiye özel eşik). Kapasitif sensörde
+// yüzde: 100=ıslak, 0=kuru. Toprak % eşiğin ALTINDAysa (kuru) ve pompa kapalıysa sula.
+inline bool sulamaGerekliYuzde(int toprakYuzde, int esikYuzde, bool pompaAcik) {
+  return toprakYuzde < esikYuzde && !pompaAcik;
+}
+
+// 3. Fan histerezisi. Eşikler bitkiye göre parametrik (default = config).
+// Bant içindeyken önceki durum korunur (röle çatırdaması önlenir).
+inline bool fanKarari(float nem, float sicaklik, bool oncekiDurum,
+                      float humHigh = HUM_HIGH_THRESHOLD,
+                      float humLow  = HUM_LOW_THRESHOLD,
+                      float tempHigh = TEMP_HIGH_THRESHOLD) {
+  if (nem > humHigh || sicaklik > tempHigh) return true;
+  if (nem < humLow  && sicaklik < tempHigh) return false;
   return oncekiDurum;  // histerezis bandı
 }
 
@@ -131,9 +141,9 @@ inline int ledParlaklikKarari(int isikSeviyesi, bool manuelMod, int manuelDeger)
   return isikSeviyesi < LIGHT_LOW_THRESHOLD ? LED_BRIGHTNESS : 0;
 }
 
-// 5. Sıcaklık alarmı.
-inline bool alarmKarari(float sicaklik) {
-  return sicaklik > TEMP_HIGH_THRESHOLD;
+// 5. Sıcaklık alarmı (eşik bitkiye göre parametrik, default = config).
+inline bool alarmKarari(float sicaklik, float tempHigh = TEMP_HIGH_THRESHOLD) {
+  return sicaklik > tempHigh;
 }
 
 // 5b. API girdi doğrulama (saf, test edilebilir): parlaklık 0-255 aralığında mı?
