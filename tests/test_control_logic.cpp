@@ -329,6 +329,39 @@ TEST_CASE("sulamaZamaniEslesme: 10 ve 17 farkli dongu") {
   CHECK(sulamaZamaniEslesme(liste, 2, 8, 0)  == -1);
 }
 
+// ---------------------------------------------------------------------------
+// 13. ThingSpeak bütçe + TalkBack metin kırpma (Faz 8)
+// ---------------------------------------------------------------------------
+TEST_CASE("gunlukIstekSayisi: 30 sn ve 15 sn") {
+  CHECK(gunlukIstekSayisi(30000) == 2880);
+  CHECK(gunlukIstekSayisi(15000) == 5760);
+  CHECK(gunlukIstekSayisi(30000) + gunlukIstekSayisi(30000) == 5760);   // limit alti
+  CHECK(gunlukIstekSayisi(15000) + gunlukIstekSayisi(15000) == 11520);  // limit ustu
+}
+TEST_CASE("metniKirp: sondaki CRLF temizlenir") {
+  char b[16] = "SULA\r\n";
+  metniKirp(b);
+  CHECK(std::strcmp(b, "SULA") == 0);
+}
+TEST_CASE("metniKirp: bastaki/sondaki bosluk") {
+  char b[16] = "  OTO  ";
+  metniKirp(b);
+  CHECK(std::strcmp(b, "OTO") == 0);
+}
+TEST_CASE("metniKirp: LED komutu newline ile") {
+  char b[16] = "LED_120\n";
+  metniKirp(b);
+  CHECK(std::strcmp(b, "LED_120") == 0);
+  CHECK(komutAyristir(b).komut == Komut::LED_AYARLA);
+  CHECK(komutAyristir(b).deger == 120);
+}
+TEST_CASE("metniKirp: bos ve nullptr guvenli") {
+  char b[4] = "";
+  metniKirp(b);
+  CHECK(std::strcmp(b, "") == 0);
+  metniKirp(nullptr);   // crash olmamali
+}
+
 TEST_CASE("sayfaSatirlari: SISTEM wifi yok / var") {
   EkranVerisi d = {0, 0, 0, false, 0, false, 0, false, false, 0};
   char l1[17], l2[17];
