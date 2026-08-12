@@ -17,6 +17,7 @@ void setup() {
   butonlariBaslat();
   ekraniBaslat();
   planBaslat();           // zamanlı sulama planını flash'tan yükle
+  bitkiYukle();            // seçili bitki türünü flash'tan yükle
   agBaslat();             // bloklamaz — bağlantı arka planda
   Serial.println(F("Akilli Sera — ag katmani hazir"));
 }
