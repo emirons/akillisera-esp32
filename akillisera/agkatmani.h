@@ -221,11 +221,13 @@ inline void handleMod() {
 
 inline void handleSaglik() {
   JsonDocument doc;
-  doc["calismaSuresi"] = millis();
-  doc["bosHeap"]       = ESP.getFreeHeap();
-  doc["rssi"]          = WiFi.RSSI();
-  doc["dhtHata"]       = kdDurum().dhtHata;
-  doc["agDurumu"]      = agBagli() ? "BAGLI" : "OTONOM";
+  doc["calismaSuresi"]     = millis();
+  doc["bosHeap"]           = ESP.getFreeHeap();
+  doc["enDusukHeap"]       = ESP.getMinFreeHeap();
+  doc["maxLoopMikrosaniye"] = kdMaxLoopUs();
+  doc["rssi"]              = WiFi.RSSI();
+  doc["dhtHata"]           = kdDurum().dhtHata;
+  doc["agDurumu"]          = agBagli() ? "BAGLI" : "OTONOM";
   String cikti;
   serializeJson(doc, cikti);
   corsBasliklari();

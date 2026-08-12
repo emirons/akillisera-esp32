@@ -10,7 +10,7 @@ ESP32 IoT Akıllı Sera & İklim Kontrol İstasyonu. **Firmware'in tamamı Kişi
 
 ```bash
 # Derleme (her değişiklikten sonra)
-arduino-cli compile --fqbn esp32:esp32:nodemcu-32s --output-dir build --warnings all akillisera/
+arduino-cli compile --fqbn esp32:esp32:nodemcu-32s --build-property build.partitions=huge_app --build-property upload.maximum_size=3145728 --output-dir build --warnings all akillisera/
 
 # Host birim testleri
 g++ -std=c++17 -Wall -Wextra -Iakillisera tests/test_control_logic.cpp -o /tmp/tests && /tmp/tests
