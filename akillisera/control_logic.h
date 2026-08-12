@@ -14,6 +14,10 @@
 enum class Komut { YOK, SULA, FAN_AC, FAN_KAPA, OTO, LED_AYARLA };
 struct KomutSonucu { Komut komut; int deger; };
 
+// Kontrol mantığının ürettiği eyleyici kararları (pompa hariç — o durum makinesi).
+// actuators.h bunu alıp donanıma yansıtır; karar VERMEZ.
+struct EyleyiciKarari { bool fanAcik; int ledParlaklik; bool alarmAktif; };
+
 // Yardımcı: 0-255 aralığına kırp.
 inline int kirp255(int v) {
   if (v < 0)   return 0;
@@ -29,6 +33,15 @@ inline bool sulamaGerekli(int toprakNem, bool pompaAcik) {
 // 2. Pompa süresi doldu mu? uint32_t çıkarma millis() taşmasını doğal tolere eder.
 inline bool pompaSuresiDoldu(uint32_t simdi, uint32_t baslangic) {
   return (uint32_t)(simdi - baslangic) >= WATERING_DURATION;
+}
+
+// 2b. Sulama güvenlik kilidi: pompa açık değilse VE son sulamadan bu yana
+//     WATERING_COOLDOWN geçtiyse tetiklenebilir. Sensör arızası "sürekli kuru"
+//     derse bitkiyi boğmayı önler. uint32_t çıkarma millis() taşmasını tolere eder.
+inline bool pompaTetiklenebilir(uint32_t simdi, uint32_t sonBitis, bool suAnAcik) {
+  if (suAnAcik) return false;
+  if ((uint32_t)(simdi - sonBitis) < WATERING_COOLDOWN) return false;
+  return true;
 }
 
 // 3. Fan histerezisi. Bant içindeyken önceki durum korunur (röle çatırdaması önlenir).
