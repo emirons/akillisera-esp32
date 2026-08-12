@@ -8,7 +8,7 @@
     { "type": "wokwi-dht22", "id": "dht", "top": -180, "left": 200, "attrs": {} },
 
     { "type": "wokwi-lcd1602", "id": "lcd", "top": -300, "left": -40,
-      "attrs": { "pins": "i2c", "address": "0x27" } },
+      "attrs": { "pins": "i2c" } },
 
     { "type": "wokwi-potentiometer", "id": "pot_soil", "top": 100, "left": 250,
       "attrs": {} },
