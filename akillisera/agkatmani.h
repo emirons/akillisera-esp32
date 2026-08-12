@@ -106,6 +106,7 @@ inline void handleDurum() {
   doc["ledOto"]        = kdLedOto();
   doc["dhtGecerli"]    = d.dhtGecerli;
   doc["rssi"]          = WiFi.RSSI();
+  doc["tsKanal"]       = TS_CHANNEL_ID;   // public channel ID (write key gizli kalır)
   char sbuf[12]; zamanMetni(sbuf, sizeof(sbuf));
   doc["saat"]          = sbuf;
   doc["calismaSuresi"] = millis();
