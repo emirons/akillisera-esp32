@@ -289,6 +289,18 @@ TEST_CASE("sayfaSatirlari: TOPRAK pompa kapali") {
   sayfaSatirlari(d, Sayfa::TOPRAK, l1, l2);
   CHECK(std::strncmp(l2, "Pompa: KAPALI", 13) == 0);
 }
+// ---------------------------------------------------------------------------
+// 11. parlaklikGecerliMi — API girdi doğrulama (0-255)
+// ---------------------------------------------------------------------------
+TEST_CASE("parlaklikGecerliMi: sinirlar ve disi") {
+  CHECK(parlaklikGecerliMi(0)   == true);
+  CHECK(parlaklikGecerliMi(255) == true);
+  CHECK(parlaklikGecerliMi(128) == true);
+  CHECK(parlaklikGecerliMi(-1)  == false);
+  CHECK(parlaklikGecerliMi(256) == false);
+  CHECK(parlaklikGecerliMi(999) == false);
+}
+
 TEST_CASE("sayfaSatirlari: SISTEM wifi yok / var") {
   EkranVerisi d = {0, 0, 0, false, 0, false, 0, false, false, 0};
   char l1[17], l2[17];

@@ -1,5 +1,5 @@
 // akillisera.ino — ESP32 Akıllı Sera firmware orkestrasyonu
-// Faz 5: LCD + butonlar. Zamanlama millis() tabanlı, loop'ta delay() YOK.
+// Faz 6: WiFi + mDNS + WebServer. loop()'ta delay()/while-bekleme YOK.
 
 #include "config.h"
 #include "control_logic.h"
@@ -7,20 +7,24 @@
 #include "actuators.h"
 #include "display.h"
 #include "buttons.h"
+#include "agkatmani.h"   // NOT: "network.h" macOS case-insensitive FS'de core'un Network.h ile cakisir
 
 void setup() {
   Serial.begin(115200);
-  eyleyicileriBaslat();   // önce eyleyiciler — röleler güvenli (RELAY_OFF) başlar
+  eyleyicileriBaslat();
   sensorlerBaslat();
   butonlariBaslat();
-  ekraniBaslat();         // içinde tek istisna delay(1500) açılış mesajı
-  Serial.println(F("Akilli Sera — LCD ve butonlar hazir"));
+  ekraniBaslat();
+  agBaslat();             // bloklamaz — bağlantı arka planda
+  Serial.println(F("Akilli Sera — ag katmani hazir"));
 }
 
 void loop() {
   unsigned long simdi = millis();
 
-  // Pompa durum makinesi ve butonlar: her turda, gecikmesiz.
+  // Ağ + pompa + butonlar: her turda, gecikmesiz.
+  agGuncelle(simdi);
+  agIsle();
   pompayiGuncelle(simdi);
   if (sayfaButonunaBasildi(simdi))  sayfaDegistir();
   if (sulamaButonunaBasildi(simdi)) pompayiTetikle(simdi);
@@ -34,28 +38,43 @@ void loop() {
     sonSensorOkuma = simdi;
     SensorVerisi v = tumSensorleriOku();
 
-    if (sulamaGerekli(v.toprakHam, pompaCalisiyor())) pompayiTetikle(simdi);
+    // Otomatik sulama her modda çalışır (güvenlik). Manuel sulama butondan/API'den.
+    if (agOtomatikMod() && sulamaGerekli(v.toprakHam, pompaCalisiyor()))
+      pompayiTetikle(simdi);
 
-    fanDurum           = fanKarari(v.nem, v.sicaklik, fanDurum);
-    karar.fanAcik      = fanDurum;
-    karar.ledParlaklik = ledParlaklikKarari(v.isikHam, false, 0);
-    karar.alarmAktif   = alarmKarari(v.sicaklik);
+    // Karar: otomatik modda sensöre göre, manuel modda API değerleriyle.
+    if (agOtomatikMod()) {
+      fanDurum          = fanKarari(v.nem, v.sicaklik, fanDurum);
+      karar.fanAcik     = fanDurum;
+      karar.ledParlaklik = ledParlaklikKarari(v.isikHam, false, 0);
+    } else {
+      karar.fanAcik     = agManuelFan();
+      karar.ledParlaklik = ledParlaklikKarari(0, true, agManuelLed());
+    }
+    karar.alarmAktif    = alarmKarari(v.sicaklik);   // alarm her modda güvenlik
 
-    // Ekran verisini güncelle (sensör periyodunda değişen alanlar)
+    // Ekran + API durum snapshot
     ekran.sicaklik    = v.sicaklik;
     ekran.nem         = v.nem;
     ekran.toprakYuzde = toprakNemYuzde(v.toprakHam);
     ekran.fanAcik     = karar.fanAcik;
     ekran.ledParlaklik = karar.ledParlaklik;
     ekran.dhtArizali  = !v.dhtGecerli;
-    ekran.wifiVar     = false;          // Faz 6'da doldurulacak
-    ekran.ipSonOktet  = 0;
+    ekran.wifiVar     = agBagli();
+    ekran.ipSonOktet  = agIpSonOktet();
+
+    DurumKaydi dk;
+    dk.sicaklik = v.sicaklik; dk.nem = v.nem;
+    dk.toprakHam = v.toprakHam; dk.toprakYuzde = ekran.toprakYuzde;
+    dk.isikHam = v.isikHam;     dk.isikYuzde = isikYuzde(v.isikHam);
+    dk.pompa = pompaCalisiyor(); dk.fan = karar.fanAcik; dk.led = karar.ledParlaklik;
+    dk.alarm = karar.alarmAktif; dk.dhtGecerli = v.dhtGecerli; dk.dhtHata = dhtHataSayisi();
+    agDurumGuncelle(dk);
   }
 
-  // Sık değişen alanlar her turda
   ekran.pompaCalisiyor = pompaCalisiyor();
   ekran.pompaKalanSn   = pompaKalanSaniye(simdi);
 
-  eyleyicileriUygula(karar, simdi);       // alarm blink için her tur
-  ekraniGuncelle(ekran, simdi);           // içeride 500 ms periyot
+  eyleyicileriUygula(karar, simdi);
+  ekraniGuncelle(ekran, simdi);
 }
