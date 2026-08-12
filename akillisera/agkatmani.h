@@ -42,8 +42,10 @@ static unsigned long s_baglanmaBaslangic = 0;
 static unsigned long s_sonYenidenDeneme = 0;
 static bool          s_sunucuBasladi = false;
 
-// Paylaşılan kontrol durumu (API <-> loop)
-static bool s_otomatik  = true;
+// Paylaşılan kontrol durumu (API <-> loop). Her özellik BAĞIMSIZ oto/manuel:
+// kullanıcı fanı otomatik tutup LED'i manuel ayarlayabilir (veya tersi).
+static bool s_fanOto    = true;   // fan: true=sensör karar verir, false=manuel
+static bool s_ledOto    = true;   // LED: true=ışığa göre, false=manuel parlaklık
 static bool s_manuelFan = false;
 static int  s_manuelLed = 0;
 static DurumKaydi s_durum = {};
@@ -54,7 +56,8 @@ constexpr unsigned long WIFI_YENIDEN_DENEME       = 30000UL;  // 30 sn sonra tek
 constexpr size_t        MAKS_GOVDE_BAYT           = 512;      // istek gövdesi üst sınır
 
 // --- Loop'un okuyacağı erişimciler ---
-inline bool    agOtomatikMod() { return s_otomatik; }
+inline bool    agFanOto()      { return s_fanOto; }
+inline bool    agLedOto()      { return s_ledOto; }
 inline bool    agManuelFan()   { return s_manuelFan; }
 inline int     agManuelLed()   { return s_manuelLed; }
 inline bool    agBagli()       { return s_agDurumu == AgDurumu::BAGLI; }
@@ -112,7 +115,8 @@ inline void handleDurum() {
   doc["fan"]           = s_durum.fan;
   doc["led"]           = s_durum.led;
   doc["alarm"]         = s_durum.alarm;
-  doc["otomatik"]      = s_otomatik;
+  doc["fanOto"]        = s_fanOto;
+  doc["ledOto"]        = s_ledOto;
   doc["dhtGecerli"]    = s_durum.dhtGecerli;
   doc["rssi"]          = WiFi.RSSI();
   doc["calismaSuresi"] = millis();
@@ -132,7 +136,7 @@ inline void handleFan() {
   if (!govdeyiAl(doc)) return;
   if (!doc["acik"].is<bool>()) { jsonHata(400, "acik bool olmali"); return; }
   s_manuelFan = doc["acik"];
-  s_otomatik = false;                // manuel fan -> otomatik moddan çık
+  s_fanOto = false;                  // fanı elle ayarlamak fanı manuel moda alır
   jsonOk("Fan ayarlandi");
 }
 
@@ -143,15 +147,19 @@ inline void handleLed() {
   int p = doc["parlaklik"];
   if (!parlaklikGecerliMi(p)) { jsonHata(400, "parlaklik 0-255 araliginda olmali"); return; }
   s_manuelLed = p;
-  s_otomatik = false;
+  s_ledOto = false;                  // LED'i elle ayarlamak LED'i manuel moda alır
   jsonOk("LED ayarlandi");
 }
 
+// Her özellik ayrı: gövde {"fan":bool} ve/veya {"led":bool} (true=otomatik).
+// Yalnızca verilen alanları günceller; en az biri gerekli.
 inline void handleMod() {
   JsonDocument doc;
   if (!govdeyiAl(doc)) return;
-  if (!doc["otomatik"].is<bool>()) { jsonHata(400, "otomatik bool olmali"); return; }
-  s_otomatik = doc["otomatik"];
+  bool degisti = false;
+  if (doc["fan"].is<bool>()) { s_fanOto = doc["fan"]; degisti = true; }
+  if (doc["led"].is<bool>()) { s_ledOto = doc["led"]; degisti = true; }
+  if (!degisti) { jsonHata(400, "fan veya led (bool) gerekli"); return; }
   jsonOk("Mod ayarlandi");
 }
 
