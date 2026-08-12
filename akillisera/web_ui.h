@@ -130,6 +130,17 @@ canvas{width:100%;height:180px;display:block}
   </div>
 
   <div class="full card">
+    <h2>Condition Ranges</h2>
+    <div id="ranges"></div>
+    <div class="note">Marker = current value, green band = ideal range. Adjust if a value is low or high.</div>
+  </div>
+
+  <div class="full card">
+    <h2>Activity &amp; Next Watering</h2>
+    <div id="act" style="display:flex;gap:18px;flex-wrap:wrap;align-items:center"></div>
+  </div>
+
+  <div class="full card">
     <h2>Insights &amp; Recommendations</h2>
     <ul id="ins"></ul>
   </div>
@@ -142,6 +153,7 @@ canvas{width:100%;height:180px;display:block}
 // on release (change), never while dragging, so the ESP32 isn't flooded.
 var fanOto=true, ledOto=true, hataSay=0;
 var hist={t:[],h:[],s:[]}, HMAX=60;
+var acc={n:0,fan:0,led:0,pump:0}, planList=[];
 function q(i){return document.getElementById(i)}
 function tema(){var r=document.documentElement;var cur=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');var nx=cur=='dark'?'light':'dark';r.setAttribute('data-theme',nx);q('tbtn').innerHTML=nx=='dark'?'&#9788;':'&#9789;';drawChart();}
 async function post(u,b){try{await fetch(u,{method:'POST',body:JSON.stringify(b)});}catch(e){}await durumCek();}
@@ -157,7 +169,7 @@ function modGorunum(){
   q('lmod').setAttribute('aria-checked',ledOto?'false':'true');q('lmodt').textContent=ledOto?'Auto':'Manual';
 }
 async function planCek(){
-  try{var r=await fetch('/api/plan');var d=await r.json();var u=q('plan');u.innerHTML='';
+  try{var r=await fetch('/api/plan');var d=await r.json();planList=d.zamanlar||[];var u=q('plan');u.innerHTML='';
     if(!d.zamanlar||!d.zamanlar.length){u.innerHTML='<li style="color:var(--mut);padding:6px 0">No schedules yet</li>';return;}
     d.zamanlar.forEach(function(z,i){
       var li=document.createElement('li');li.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--ln)';
@@ -190,6 +202,24 @@ function insights(d){var out=[];
   if(!out.length)out.push(['&#9989;','All conditions are optimal.']);
   var u=q('ins');u.innerHTML='';out.forEach(function(o){var li=document.createElement('li');li.className='ins';
     li.innerHTML='<span>'+o[0]+'</span><span>'+o[1]+'</span>';u.appendChild(li);});}
+function gauge(name,val,mn,mx,lo,hi,unit){
+  var v=Number(val);var p=Math.max(0,Math.min(100,(v-mn)/(mx-mn)*100));
+  var bl=(lo-mn)/(mx-mn)*100,bw=(hi-lo)/(mx-mn)*100;var ok=v>=lo&&v<=hi;var tag=ok?'OK':(v<lo?'low':'high');
+  return '<div style="margin:12px 0"><div style="display:flex;justify-content:space-between;font-size:13px"><span>'+name+'</span><span style="font-weight:700;color:'+(ok?'var(--ac)':'var(--dg)')+'">'+val+unit+' · '+tag+'</span></div><div style="position:relative;height:12px;background:var(--ln);border-radius:6px;margin-top:5px"><div style="position:absolute;left:'+bl+'%;width:'+bw+'%;top:0;bottom:0;background:rgba(67,209,122,.35);border-radius:6px"></div><div style="position:absolute;left:'+p+'%;top:-4px;width:4px;height:20px;background:var(--tx);border-radius:2px;transform:translateX(-2px)"></div></div></div>';
+}
+function renderRanges(d){var h='';
+  if(d.dhtGecerli){h+=gauge('Temperature',d.sicaklik.toFixed(1),0,50,18,28,' °C');h+=gauge('Humidity',Math.round(d.nem),0,100,40,70,'%');}
+  h+=gauge('Soil Moisture',d.toprakYuzde,0,100,40,80,'%');h+=gauge('Light',d.isikYuzde,0,100,30,80,'%');q('ranges').innerHTML=h;}
+function ring(name,pct){return '<div style="text-align:center"><div style="width:72px;height:72px;border-radius:50%;background:conic-gradient(var(--ac) '+pct+'%,var(--ln) 0)"><div style="position:relative;top:10px;left:10px;width:52px;height:52px;border-radius:50%;background:var(--card);display:flex;align-items:center;justify-content:center;font-weight:700">'+pct+'%</div></div><div style="font-size:12px;color:var(--mut);margin-top:4px">'+name+'</div></div>';}
+function nextWatering(saat){
+  if(!planList.length||!saat||saat.charAt(0)=='-')return '—';
+  var p=saat.split(':');var now=parseInt(p[0])*60+parseInt(p[1]);var best=1e9,bt='';
+  planList.forEach(function(z){var sm=z.saat*60+z.dakika;var df=(sm-now+1440)%1440;if(df<best){best=df;bt=('0'+z.saat).slice(-2)+':'+('0'+z.dakika).slice(-2);}});
+  return bt+' (in '+Math.floor(best/60)+'h '+(best%60)+'m)';}
+function renderActivity(d){var n=acc.n||1;
+  var html=ring('Fan',Math.round(acc.fan/n*100))+ring('LED',Math.round(acc.led/n*100))+ring('Pump',Math.round(acc.pump/n*100));
+  html+='<div style="flex:1;min-width:150px"><div style="font-size:13px;color:var(--mut)">Next watering</div><div style="font-size:19px;font-weight:700;color:var(--ac)">'+nextWatering(d.saat)+'</div></div>';
+  q('act').innerHTML=html;}
 async function durumCek(){
   try{
     var r=await fetch('/api/durum');if(!r.ok)throw 0;var d=await r.json();hataSay=0;
@@ -206,7 +236,8 @@ async function durumCek(){
     q('up').textContent='Uptime: '+Math.floor(d.calismaSuresi/1000)+'s';
     q('rssi').textContent='Signal: '+(d.rssi||'--')+' dBm';
     q('son').textContent='Updated: now';
-    pushHist(d);drawChart();insights(d);
+    acc.n++;if(d.fan)acc.fan++;if(d.led>0)acc.led++;if(d.pompa)acc.pump++;
+    pushHist(d);drawChart();insights(d);renderRanges(d);renderActivity(d);
   }catch(e){hataSay++;q('dot').className='dot';q('stt').textContent='No connection';}
 }
 durumCek();planCek();setInterval(durumCek,2000);
