@@ -36,4 +36,5 @@ void loop() {
     if (!v.dhtGecerli) Serial.print(F("  [DHT ARIZALI]"));
     Serial.println();
   }
+
 }
