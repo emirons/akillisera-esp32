@@ -199,3 +199,105 @@ TEST_CASE("pompaTetiklenebilir: millis tasmasi, gecen 59 sn -> reddet") {
   uint32_t simdi = sonBitis + 59000u;
   CHECK(pompaTetiklenebilir(simdi, sonBitis, false) == false);
 }
+
+// ---------------------------------------------------------------------------
+// 9. butonGuncelle / butonBasildi — debounce (BUTTON_DEBOUNCE_MS 50), INPUT_PULLUP
+// ---------------------------------------------------------------------------
+TEST_CASE("butonGuncelle: temiz basis 50 ms sonra bildirilir") {
+  ButonDurumu d = {true, true, 0};   // serbest: ham=true, kararli=true
+  CHECK(butonGuncelle(d, false, 0)  == false);  // yeni ham, henuz kararli degil
+  CHECK(butonGuncelle(d, false, 49) == false);  // 49 ms < 50
+  CHECK(butonGuncelle(d, false, 50) == true);   // 50 ms -> gecis bildirilir
+  CHECK(butonBasildi(d) == true);               // INPUT_PULLUP: kararli false = basili
+}
+TEST_CASE("butonGuncelle: titresim tek gecis uretir") {
+  ButonDurumu d = {true, true, 0};
+  int gecisSayisi = 0;
+  int t[] = {0, 2, 4, 6, 8};                    // 10 ms icinde 5 kez cirpinma
+  bool ham[] = {false, true, false, true, false};
+  for (int i = 0; i < 5; i++) if (butonGuncelle(d, ham[i], t[i])) gecisSayisi++;
+  // cirpinma sirasinda gecis olmamali
+  CHECK(gecisSayisi == 0);
+  // son degisim t=8, kararli hale 50 ms sonra
+  CHECK(butonGuncelle(d, false, 58) == true);
+  CHECK(gecisSayisi == 0);
+}
+TEST_CASE("butonGuncelle: basili tutma tekrar uretmez") {
+  ButonDurumu d = {true, true, 0};
+  butonGuncelle(d, false, 0);
+  CHECK(butonGuncelle(d, false, 50) == true);   // ilk gecis
+  CHECK(butonGuncelle(d, false, 100) == false); // basili tutuluyor, tekrar yok
+  CHECK(butonGuncelle(d, false, 5000) == false);
+}
+TEST_CASE("butonGuncelle: birak-bas iki ayri gecis") {
+  ButonDurumu d = {true, true, 0};
+  butonGuncelle(d, false, 0);
+  CHECK(butonGuncelle(d, false, 50) == true);    // basildi
+  butonGuncelle(d, true, 100);                    // birakildi (ham degisti)
+  CHECK(butonGuncelle(d, true, 150) == true);     // serbest gecisi
+  CHECK(butonBasildi(d) == false);
+}
+TEST_CASE("butonGuncelle: millis tasmasi sirasinda dogru") {
+  ButonDurumu d = {false, true, 0xFFFFFFF0u};    // ham=false, kararli henuz true
+  CHECK(butonGuncelle(d, false, 34u) == true);   // gecen 50 ms (uint32 wrap)
+}
+
+// ---------------------------------------------------------------------------
+// 10. sayfaSatirlari — LCD metinleri: tam 16 karakter, ASCII (Türkçe yok)
+// ---------------------------------------------------------------------------
+static bool asciiVe16(const char* s) {
+  if (std::strlen(s) != 16) return false;
+  for (int i = 0; i < 16; i++) if ((unsigned char)s[i] > 126 || (unsigned char)s[i] < 32) return false;
+  return true;
+}
+TEST_CASE("sayfaSatirlari: IKLIM normal -> 16 char, ASCII") {
+  EkranVerisi d = {23.4f, 65.0f, 42, false, 0, false, 0, false, false, 0};
+  char l1[17], l2[17];
+  sayfaSatirlari(d, Sayfa::IKLIM, l1, l2);
+  CHECK(asciiVe16(l1));
+  CHECK(asciiVe16(l2));
+  CHECK(std::strncmp(l1, "T:23.4C H:65%", 13) == 0);
+}
+TEST_CASE("sayfaSatirlari: IKLIM uc degerler tasmadan sigar") {
+  // en uzun: negatif sicaklik + nem 100 + LED 255
+  EkranVerisi d = {-40.0f, 100.0f, 100, true, 255, false, 0, false, false, 0};
+  char l1[17], l2[17];
+  sayfaSatirlari(d, Sayfa::IKLIM, l1, l2);
+  CHECK(asciiVe16(l1));               // "T:-40.0C H:100%" 15 -> padli 16
+  CHECK(asciiVe16(l2));               // "Fan:ACIK LED:255" tam 16
+  CHECK(std::strncmp(l2, "Fan:ACIK LED:255", 16) == 0);
+}
+TEST_CASE("sayfaSatirlari: IKLIM DHT arizali -> SENSOR HATASI") {
+  EkranVerisi d = {0, 0, 0, false, 0, false, 0, true, false, 0};
+  char l1[17], l2[17];
+  sayfaSatirlari(d, Sayfa::IKLIM, l1, l2);
+  CHECK(std::strncmp(l1, "SENSOR HATASI", 13) == 0);
+  CHECK(asciiVe16(l1));
+}
+TEST_CASE("sayfaSatirlari: TOPRAK sulama geri sayim") {
+  EkranVerisi d = {0, 0, 100, false, 0, true, 3, false, false, 0};
+  char l1[17], l2[17];
+  sayfaSatirlari(d, Sayfa::TOPRAK, l1, l2);
+  CHECK(asciiVe16(l1));
+  CHECK(asciiVe16(l2));
+  CHECK(std::strncmp(l1, "Toprak: 100%", 12) == 0);
+  CHECK(std::strncmp(l2, "Sulaniyor 3s", 12) == 0);
+}
+TEST_CASE("sayfaSatirlari: TOPRAK pompa kapali") {
+  EkranVerisi d = {0, 0, 42, false, 0, false, 0, false, false, 0};
+  char l1[17], l2[17];
+  sayfaSatirlari(d, Sayfa::TOPRAK, l1, l2);
+  CHECK(std::strncmp(l2, "Pompa: KAPALI", 13) == 0);
+}
+TEST_CASE("sayfaSatirlari: SISTEM wifi yok / var") {
+  EkranVerisi d = {0, 0, 0, false, 0, false, 0, false, false, 0};
+  char l1[17], l2[17];
+  sayfaSatirlari(d, Sayfa::SISTEM, l1, l2);
+  CHECK(std::strncmp(l1, "WiFi:YOK", 8) == 0);
+  CHECK(std::strncmp(l2, "akillisera.local", 16) == 0);
+  CHECK(asciiVe16(l2));
+  d.wifiVar = true; d.ipSonOktet = 42;
+  sayfaSatirlari(d, Sayfa::SISTEM, l1, l2);
+  CHECK(std::strncmp(l1, "WiFi:OK .42", 11) == 0);
+  CHECK(asciiVe16(l1));
+}
