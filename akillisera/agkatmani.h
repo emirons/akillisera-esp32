@@ -23,6 +23,7 @@
 #include "actuators.h"
 #include "zaman.h"
 #include "sulama_plani.h"
+#include "bitki.h"
 #include "web_ui.h"
 #include "secrets.h"
 
@@ -107,6 +108,7 @@ inline void handleDurum() {
   doc["dhtGecerli"]    = d.dhtGecerli;
   doc["rssi"]          = WiFi.RSSI();
   doc["tsKanal"]       = TS_CHANNEL_ID;   // public channel ID (write key gizli kalır)
+  doc["bitki"]         = bitkiAl();
   char sbuf[12]; zamanMetni(sbuf, sizeof(sbuf));
   doc["saat"]          = sbuf;
   doc["calismaSuresi"] = millis();
@@ -141,6 +143,25 @@ inline void handlePlanEkle() {
   if (!zamanGecerliMi(s, d)) { jsonHata(400, "saat 0-23, dakika 0-59 olmali"); return; }
   if (!planEkle(s, d)) { jsonHata(400, "eklenemedi (dolu veya mukerrer)"); return; }
   jsonOk("Sulama zamani eklendi");
+}
+
+// GET /api/bitki -> seçili bitki; POST /api/bitki {bitki:"anahtar"} -> ayarla
+inline void handleBitki() {
+  if (s_server.method() == HTTP_POST) {
+    JsonDocument doc;
+    if (!govdeyiAl(doc)) return;
+    if (!doc["bitki"].is<const char*>()) { jsonHata(400, "bitki metin olmali"); return; }
+    const char* k = doc["bitki"];
+    if (strlen(k) == 0 || strlen(k) >= 20) { jsonHata(400, "gecersiz bitki anahtari"); return; }
+    bitkiAyarla(k);
+    jsonOk("Bitki ayarlandi");
+  } else {
+    JsonDocument doc;
+    doc["bitki"] = bitkiAl();
+    String cikti; serializeJson(doc, cikti);
+    corsBasliklari();
+    s_server.send(200, F("application/json"), cikti);
+  }
 }
 
 // DELETE /api/plan {index} -> sil
@@ -227,6 +248,8 @@ inline void sunucuBaslat() {
   s_server.on("/api/plan",    HTTP_GET,    handlePlan);
   s_server.on("/api/plan",    HTTP_POST,   handlePlanEkle);
   s_server.on("/api/plan",    HTTP_DELETE, handlePlanSil);
+  s_server.on("/api/bitki",   HTTP_GET,    handleBitki);
+  s_server.on("/api/bitki",   HTTP_POST,   handleBitki);
   s_server.onNotFound(handleNotFound);
   s_server.begin();
   s_sunucuBasladi = true;
