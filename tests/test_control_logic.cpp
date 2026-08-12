@@ -301,6 +301,34 @@ TEST_CASE("parlaklikGecerliMi: sinirlar ve disi") {
   CHECK(parlaklikGecerliMi(999) == false);
 }
 
+// ---------------------------------------------------------------------------
+// 12. Zamanlı sulama — zamanGecerliMi + sulamaZamaniEslesme (saf)
+// ---------------------------------------------------------------------------
+TEST_CASE("zamanGecerliMi: gecerli ve gecersiz saatler") {
+  CHECK(zamanGecerliMi(8, 0)   == true);
+  CHECK(zamanGecerliMi(23, 59) == true);
+  CHECK(zamanGecerliMi(0, 0)   == true);
+  CHECK(zamanGecerliMi(24, 0)  == false);
+  CHECK(zamanGecerliMi(12, 60) == false);
+  CHECK(zamanGecerliMi(-1, 0)  == false);
+  CHECK(zamanGecerliMi(12, -1) == false);
+}
+TEST_CASE("sulamaZamaniEslesme: eslesen indeks veya -1") {
+  SulamaZamani liste[] = {{8,0},{12,0},{20,0}};
+  CHECK(sulamaZamaniEslesme(liste, 3, 8, 0)   == 0);
+  CHECK(sulamaZamaniEslesme(liste, 3, 12, 0)  == 1);
+  CHECK(sulamaZamaniEslesme(liste, 3, 20, 0)  == 2);
+  CHECK(sulamaZamaniEslesme(liste, 3, 12, 1)  == -1);  // dakika tutmuyor
+  CHECK(sulamaZamaniEslesme(liste, 3, 7, 59)  == -1);
+  CHECK(sulamaZamaniEslesme(liste, 0, 8, 0)   == -1);  // bos liste
+}
+TEST_CASE("sulamaZamaniEslesme: 10 ve 17 farkli dongu") {
+  SulamaZamani liste[] = {{10,0},{17,0}};
+  CHECK(sulamaZamaniEslesme(liste, 2, 10, 0) == 0);
+  CHECK(sulamaZamaniEslesme(liste, 2, 17, 0) == 1);
+  CHECK(sulamaZamaniEslesme(liste, 2, 8, 0)  == -1);
+}
+
 TEST_CASE("sayfaSatirlari: SISTEM wifi yok / var") {
   EkranVerisi d = {0, 0, 0, false, 0, false, 0, false, false, 0};
   char l1[17], l2[17];

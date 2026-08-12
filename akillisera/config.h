@@ -63,6 +63,14 @@ constexpr int LEDC_RES     = 8;     // 8 bit -> 0-255
 constexpr int LEDC_CHANNEL = 0;     // yalnızca core 2.x dalında kullanılır
 
 // ============================================================================
+// NTP SAAT + ZAMANLI SULAMA
+// ============================================================================
+constexpr char NTP_SUNUCU[]        = "pool.ntp.org";
+constexpr long GMT_OFFSET_SN        = 3 * 3600;  // Türkiye UTC+3
+constexpr int  YAZ_SAATI_OFFSET_SN  = 0;          // Türkiye yaz saati uygulamıyor
+constexpr int  MAKS_SULAMA_ZAMANI   = 12;         // en fazla zamanlı sulama girdisi
+
+// ============================================================================
 // Arduino'ya bağımlı kısımlar — host derlemesinde (g++) atlanır.
 // control_logic.h bu bloğa dokunmaz; host'ta test edilebilmesi için ayrık.
 // ============================================================================
