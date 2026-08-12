@@ -142,6 +142,24 @@ inline bool parlaklikGecerliMi(int deger) {
   return deger >= 0 && deger <= 255;
 }
 
+// --- Zamanlı sulama (saf mantık, host'ta test edilir) ---
+// Her gün tekrarlı sulama saati. Donanım/NTP bağımsız düz veri.
+struct SulamaZamani { uint8_t saat; uint8_t dakika; };
+
+// Saat/dakika geçerli mi (24 saat formatı).
+inline bool zamanGecerliMi(int saat, int dakika) {
+  return saat >= 0 && saat <= 23 && dakika >= 0 && dakika <= 59;
+}
+
+// Verilen saat:dakika listedeki bir sulama zamanıyla eşleşiyor mu?
+// Eşleşen ilk girdinin indeksini, yoksa -1 döner.
+inline int sulamaZamaniEslesme(const SulamaZamani* liste, int adet, int saat, int dakika) {
+  for (int i = 0; i < adet; i++) {
+    if (liste[i].saat == saat && liste[i].dakika == dakika) return i;
+  }
+  return -1;
+}
+
 // 6. Sensör değeri geçerli mi? NaN/sonsuz değil ve makul aralıkta.
 inline bool sensorDegeriGecerli(float deger) {
   return std::isfinite(deger) && deger >= -40.0f && deger <= 80.0f;

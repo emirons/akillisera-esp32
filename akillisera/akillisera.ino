@@ -15,6 +15,7 @@ void setup() {
   sensorlerBaslat();
   butonlariBaslat();
   ekraniBaslat();
+  planBaslat();           // zamanlı sulama planını flash'tan yükle
   agBaslat();             // bloklamaz — bağlantı arka planda
   Serial.println(F("Akilli Sera — ag katmani hazir"));
 }
@@ -25,6 +26,7 @@ void loop() {
   // Ağ + pompa + butonlar: her turda, gecikmesiz.
   agGuncelle(simdi);
   agIsle();
+  planGuncelle(simdi);      // zamanlı sulama — saat plana denk gelince tetikler
   pompayiGuncelle(simdi);
   if (sayfaButonunaBasildi(simdi))  sayfaDegistir();
   if (sulamaButonunaBasildi(simdi)) pompayiTetikle(simdi);

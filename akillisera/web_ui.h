@@ -33,6 +33,7 @@ h1{font-size:22px;margin:0}
 .card.dim{opacity:.45}
 .ctrl{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:14px;margin-bottom:10px}
 .row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px}
+.ctrl .row+.row{margin-top:12px;border-top:1px solid var(--ln);padding-top:12px}
 button{font:inherit;color:var(--tx);background:var(--ln);border:1px solid var(--ac);border-radius:10px;min-height:48px;padding:0 16px;cursor:pointer}
 .primary{width:100%;background:var(--ac);color:#04120a;font-size:18px;font-weight:700;border:none}
 .primary:disabled{opacity:.5;cursor:default}
@@ -91,6 +92,18 @@ input[type=range]{width:100%;height:44px}
   </div>
 </div>
 
+<div class="ctrl">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span class="lbl">Zamanli Sulama</span><span class="val" id="saat">--:--:--</span>
+  </div>
+  <ul id="plan" style="list-style:none;padding:0;margin:12px 0 10px"></ul>
+  <div style="display:flex;gap:10px">
+    <input type="time" id="yenizaman" value="08:00" aria-label="Yeni sulama saati"
+      style="flex:1;min-height:48px;background:var(--ln);color:var(--tx);border:1px solid var(--ln);border-radius:10px;padding:0 12px;font:inherit">
+    <button onclick="planEkle()">Ekle</button>
+  </div>
+</div>
+
 <div class="ft"><span id="up">Calisma: --</span><span id="rssi">Sinyal: --</span><span id="son">Guncelleme: --</span></div>
 
 <script>
@@ -106,6 +119,21 @@ function fmod(){post('/api/mod',{fan:!fanOto});}
 function lmod(){post('/api/mod',{led:!ledOto});}
 function fan(){if(fanOto)return;post('/api/fan',{acik:q('fan').getAttribute('aria-checked')!='true'});}
 function ledGonder(v){if(ledOto)return;post('/api/led',{parlaklik:parseInt(v)});}
+async function planCek(){
+  try{var r=await fetch('/api/plan');var d=await r.json();var u=q('plan');u.innerHTML='';
+    if(!d.zamanlar||!d.zamanlar.length){u.innerHTML='<li style="color:var(--mut);padding:6px 0">Henuz zaman eklenmedi</li>';return;}
+    d.zamanlar.forEach(function(z,i){
+      var li=document.createElement('li');li.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--ln)';
+      var t=document.createElement('span');t.style.fontSize='18px';t.textContent=('0'+z.saat).slice(-2)+':'+('0'+z.dakika).slice(-2);
+      var b=document.createElement('button');b.textContent='Sil';b.setAttribute('aria-label','Sulama zamanini sil');
+      b.style.cssText='min-height:44px;background:var(--dg);border-color:var(--dg);color:#fff';b.onclick=function(){planSil(i)};
+      li.appendChild(t);li.appendChild(b);u.appendChild(li);
+    });
+  }catch(e){}
+}
+async function planEkle(){var v=q('yenizaman').value;if(!v)return;var p=v.split(':');
+  try{await fetch('/api/plan',{method:'POST',body:JSON.stringify({saat:parseInt(p[0]),dakika:parseInt(p[1])})});}catch(e){}planCek();}
+async function planSil(i){try{await fetch('/api/plan',{method:'DELETE',body:JSON.stringify({index:i})});}catch(e){}planCek();}
 function modGorunum(){
   q('fanrow').className='row'+(fanOto?' disabled':'');
   q('ledrow').className='row'+(ledOto?' disabled':'');
@@ -124,12 +152,13 @@ async function durumCek(){
     q('fan').setAttribute('aria-checked',d.fan?'true':'false');
     var ls=q('led');if(document.activeElement!==ls){ls.value=d.led;q('ledv').textContent=d.led;}
     fanOto=d.fanOto;ledOto=d.ledOto;modGorunum();
+    q('saat').textContent=d.saat||'--:--:--';
     q('up').textContent='Calisma: '+Math.floor(d.calismaSuresi/1000)+'s';
     q('rssi').textContent='Sinyal: '+(d.rssi||'--')+' dBm';
     q('son').textContent='Guncelleme: simdi';
   }catch(e){hataSay++;q('dot').className='dot';q('stt').textContent='Baglanti yok';}
 }
-durumCek();setInterval(durumCek,2000);
+durumCek();planCek();setInterval(durumCek,2000);
 </script>
 </body>
 </html>)HTMLDOC";
