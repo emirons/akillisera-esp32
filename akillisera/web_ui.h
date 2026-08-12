@@ -141,6 +141,12 @@ canvas{width:100%;height:180px;display:block}
   </div>
 
   <div class="full card">
+    <h2>History (ThingSpeak)</h2>
+    <div id="ts" class="grid"></div>
+    <div class="note">Long-term cloud history. Needs internet and a public ThingSpeak channel.</div>
+  </div>
+
+  <div class="full card">
     <h2>Insights &amp; Recommendations</h2>
     <ul id="ins"></ul>
   </div>
@@ -216,6 +222,11 @@ function nextWatering(saat){
   var p=saat.split(':');var now=parseInt(p[0])*60+parseInt(p[1]);var best=1e9,bt='';
   planList.forEach(function(z){var sm=z.saat*60+z.dakika;var df=(sm-now+1440)%1440;if(df<best){best=df;bt=('0'+z.saat).slice(-2)+':'+('0'+z.dakika).slice(-2);}});
   return bt+' (in '+Math.floor(best/60)+'h '+(best%60)+'m)';}
+function renderTS(k){var t=q('ts');
+  if(!k||k=='THINGSPEAK_CHANNEL_ID'||k=='kanal_id'||k=='KANAL_ID'){t.innerHTML='<div class="note" style="grid-column:1/-1">Set a public ThingSpeak channel to see history charts.</div>';return;}
+  if(t.getAttribute('data-k')==k)return;t.setAttribute('data-k',k);   // iframe'leri bir kez kur
+  var f=[[1,'Temperature','d62020'],[2,'Humidity','1f6feb'],[3,'Soil','2ea043'],[4,'Light','e3b341']];
+  t.innerHTML=f.map(function(x){return '<iframe title="'+x[1]+'" loading="lazy" style="border:1px solid var(--ln);border-radius:8px;width:100%;height:160px" src="https://thingspeak.com/channels/'+k+'/charts/'+x[0]+'?bgcolor=%23ffffff&color=%23'+x[2]+'&dynamic=true&days=1&results=60&type=line&title='+encodeURIComponent(x[1])+'&xaxis=Time&yaxis="></iframe>';}).join('');}
 function renderActivity(d){var n=acc.n||1;
   var html=ring('Fan',Math.round(acc.fan/n*100))+ring('LED',Math.round(acc.led/n*100))+ring('Pump',Math.round(acc.pump/n*100));
   html+='<div style="flex:1;min-width:150px"><div style="font-size:13px;color:var(--mut)">Next watering</div><div style="font-size:19px;font-weight:700;color:var(--ac)">'+nextWatering(d.saat)+'</div></div>';
@@ -237,7 +248,7 @@ async function durumCek(){
     q('rssi').textContent='Signal: '+(d.rssi||'--')+' dBm';
     q('son').textContent='Updated: now';
     acc.n++;if(d.fan)acc.fan++;if(d.led>0)acc.led++;if(d.pompa)acc.pump++;
-    pushHist(d);drawChart();insights(d);renderRanges(d);renderActivity(d);
+    pushHist(d);drawChart();insights(d);renderRanges(d);renderActivity(d);renderTS(d.tsKanal);
   }catch(e){hataSay++;q('dot').className='dot';q('stt').textContent='No connection';}
 }
 durumCek();planCek();setInterval(durumCek,2000);
