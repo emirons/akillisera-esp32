@@ -38,20 +38,24 @@ void loop() {
     sonSensorOkuma = simdi;
     SensorVerisi v = tumSensorleriOku();
 
-    // Otomatik sulama her modda çalışır (güvenlik). Manuel sulama butondan/API'den.
-    if (agOtomatikMod() && sulamaGerekli(v.toprakHam, pompaCalisiyor()))
+    // Otomatik sulama her zaman aktif (güvenlik kilidi 60 sn içeride).
+    // Manuel sulama buton/API'den her koşulda çalışır.
+    if (sulamaGerekli(v.toprakHam, pompaCalisiyor()))
       pompayiTetikle(simdi);
 
-    // Karar: otomatik modda sensöre göre, manuel modda API değerleriyle.
-    if (agOtomatikMod()) {
-      fanDurum          = fanKarari(v.nem, v.sicaklik, fanDurum);
-      karar.fanAcik     = fanDurum;
-      karar.ledParlaklik = ledParlaklikKarari(v.isikHam, false, 0);
+    // Fan: bağımsız oto/manuel.
+    if (agFanOto()) {
+      fanDurum      = fanKarari(v.nem, v.sicaklik, fanDurum);
+      karar.fanAcik = fanDurum;
     } else {
-      karar.fanAcik     = agManuelFan();
-      karar.ledParlaklik = ledParlaklikKarari(0, true, agManuelLed());
+      karar.fanAcik = agManuelFan();
     }
-    karar.alarmAktif    = alarmKarari(v.sicaklik);   // alarm her modda güvenlik
+
+    // LED: bağımsız oto/manuel.
+    if (agLedOto()) karar.ledParlaklik = ledParlaklikKarari(v.isikHam, false, 0);
+    else            karar.ledParlaklik = ledParlaklikKarari(0, true, agManuelLed());
+
+    karar.alarmAktif = alarmKarari(v.sicaklik);      // alarm her koşulda güvenlik
 
     // Ekran + API durum snapshot
     ekran.sicaklik    = v.sicaklik;

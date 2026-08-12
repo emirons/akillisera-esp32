@@ -67,19 +67,25 @@ input[type=range]{width:100%;height:44px}
 </div>
 
 <div class="ctrl">
-  <div class="row"><span class="lbl">Mod</span>
+  <div class="row"><span class="lbl">Fan</span>
     <div style="display:flex;align-items:center;gap:10px">
-      <span id="modt" class="val">Otomatik</span>
-      <div class="tg" id="mod" role="switch" aria-checked="false" tabindex="0" aria-label="Otomatik veya Manuel mod" onclick="mod()" onkeydown="if(event.key==' '||event.key=='Enter'){event.preventDefault();mod()}"></div>
+      <span id="fmodt" class="val">Otomatik</span>
+      <div class="tg" id="fmod" role="switch" aria-checked="false" tabindex="0" aria-label="Fan otomatik veya manuel" onclick="fmod()" onkeydown="if(event.key==' '||event.key=='Enter'){event.preventDefault();fmod()}"></div>
     </div>
+  </div>
+  <div class="row" id="fanrow"><span class="lbl">Fan durumu</span>
+    <div class="tg" id="fan" role="switch" aria-checked="false" tabindex="0" aria-label="Fan ac veya kapa" onclick="fan()" onkeydown="if(event.key==' '||event.key=='Enter'){event.preventDefault();fan()}"></div>
   </div>
 </div>
 
-<div class="ctrl" id="mctrl">
-  <div class="row"><span class="lbl">Fan</span>
-    <div class="tg" id="fan" role="switch" aria-checked="false" tabindex="0" aria-label="Fan ac veya kapa" onclick="fan()" onkeydown="if(event.key==' '||event.key=='Enter'){event.preventDefault();fan()}"></div>
+<div class="ctrl">
+  <div class="row"><span class="lbl">Serit LED</span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="lmodt" class="val">Otomatik</span>
+      <div class="tg" id="lmod" role="switch" aria-checked="false" tabindex="0" aria-label="LED otomatik veya manuel" onclick="lmod()" onkeydown="if(event.key==' '||event.key=='Enter'){event.preventDefault();lmod()}"></div>
+    </div>
   </div>
-  <div class="row" style="display:block"><div style="display:flex;justify-content:space-between"><span class="lbl">Serit LED Parlaklik</span><span class="val" id="ledv">0</span></div>
+  <div class="row" id="ledrow" style="display:block"><div style="display:flex;justify-content:space-between"><span class="lbl">Parlaklik</span><span class="val" id="ledv">0</span></div>
     <input type="range" id="led" min="0" max="255" value="0" aria-label="LED parlaklik 0 ile 255 arasi"
       oninput="document.getElementById('ledv').textContent=this.value" onchange="ledGonder(this.value)">
   </div>
@@ -90,14 +96,22 @@ input[type=range]{width:100%;height:44px}
 <script>
 // Sürüklerken DEĞİL, yalnızca bırakınca (change) istek atılır — aksi halde ESP32
 // saniyede onlarca isteğe boğulur. oninput sadece etiketi günceller.
-var otomatik=true, hataSay=0;
+// Fan ve LED BAĞIMSIZ: her biri kendi oto/manuel modunda. Manuel değilken
+// o kontrol soluk ve pasif. Slider yalnızca bırakınca (change) istek atar.
+var fanOto=true, ledOto=true, hataSay=0;
 function q(i){return document.getElementById(i)}
 async function post(u,b){try{await fetch(u,{method:'POST',body:JSON.stringify(b)});}catch(e){}await durumCek();}
 function sula(){var b=q('sula');post('/api/sula',{});var n=5;b.disabled=true;b.textContent='Sulaniyor '+n+'s';var t=setInterval(function(){n--;if(n<=0){clearInterval(t);b.disabled=false;b.textContent='SULA (5 sn)';}else b.textContent='Sulaniyor '+n+'s';},1000);}
-function fan(){if(otomatik)return;post('/api/fan',{acik:q('fan').getAttribute('aria-checked')!='true'});}
-function ledGonder(v){if(otomatik)return;post('/api/led',{parlaklik:parseInt(v)});}
-function mod(){post('/api/mod',{otomatik:!otomatik});}
-function manuelGorunum(){q('mctrl').className='ctrl'+(otomatik?' disabled':'');}
+function fmod(){post('/api/mod',{fan:!fanOto});}
+function lmod(){post('/api/mod',{led:!ledOto});}
+function fan(){if(fanOto)return;post('/api/fan',{acik:q('fan').getAttribute('aria-checked')!='true'});}
+function ledGonder(v){if(ledOto)return;post('/api/led',{parlaklik:parseInt(v)});}
+function modGorunum(){
+  q('fanrow').className='row'+(fanOto?' disabled':'');
+  q('ledrow').className='row'+(ledOto?' disabled':'');
+  q('fmod').setAttribute('aria-checked',fanOto?'false':'true');q('fmodt').textContent=fanOto?'Otomatik':'Manuel';
+  q('lmod').setAttribute('aria-checked',ledOto?'false':'true');q('lmodt').textContent=ledOto?'Otomatik':'Manuel';
+}
 async function durumCek(){
   try{
     var r=await fetch('/api/durum');if(!r.ok)throw 0;var d=await r.json();hataSay=0;
@@ -109,8 +123,7 @@ async function durumCek(){
     q('isk').textContent=d.isikYuzde;q('iskb').style.width=d.isikYuzde+'%';
     q('fan').setAttribute('aria-checked',d.fan?'true':'false');
     var ls=q('led');if(document.activeElement!==ls){ls.value=d.led;q('ledv').textContent=d.led;}
-    otomatik=d.otomatik;q('mod').setAttribute('aria-checked',otomatik?'false':'true');
-    q('modt').textContent=otomatik?'Otomatik':'Manuel';manuelGorunum();
+    fanOto=d.fanOto;ledOto=d.ledOto;modGorunum();
     q('up').textContent='Calisma: '+Math.floor(d.calismaSuresi/1000)+'s';
     q('rssi').textContent='Sinyal: '+(d.rssi||'--')+' dBm';
     q('son').textContent='Guncelleme: simdi';
