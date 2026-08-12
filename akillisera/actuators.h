@@ -60,6 +60,14 @@ inline void pompayiGuncelle(unsigned long simdi) {
   }
 }
 
+// Kalan sulama süresi (saniye, yukarı yuvarlı) — LCD geri sayımı için.
+inline int pompaKalanSaniye(unsigned long simdi) {
+  if (!s_pompa.acik) return 0;
+  uint32_t gecen = (uint32_t)simdi - (uint32_t)s_pompa.baslangic;
+  if (gecen >= WATERING_DURATION) return 0;
+  return (int)((WATERING_DURATION - gecen + 999) / 1000);
+}
+
 // 3) FAN — yalnızca durum değişince pin yaz (gereksiz röle işlemi yok)
 inline void fanAyarla(bool acik) {
   if (acik == s_sonFanDurumu) return;

@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstring>
 #include <cstdlib>
+#include <cstdio>
 #include "config.h"
 
 // Web arayüzü ve TalkBack'ten gelen komutlar.
@@ -17,6 +18,53 @@ struct KomutSonucu { Komut komut; int deger; };
 // Kontrol mantığının ürettiği eyleyici kararları (pompa hariç — o durum makinesi).
 // actuators.h bunu alıp donanıma yansıtır; karar VERMEZ.
 struct EyleyiciKarari { bool fanAcik; int ledParlaklik; bool alarmAktif; };
+
+// --- LCD sayfa formatlama (saf, host'ta test edilebilir) ---
+// LCD karakter seti Türkçe içermez -> yalnızca ASCII (c,g,i,o,s,u).
+enum class Sayfa : uint8_t { IKLIM = 0, TOPRAK = 1, SISTEM = 2, SAYI = 3 };
+
+struct EkranVerisi {
+  float   sicaklik;
+  float   nem;
+  int     toprakYuzde;
+  bool    fanAcik;
+  int     ledParlaklik;
+  bool    pompaCalisiyor;
+  int     pompaKalanSn;
+  bool    dhtArizali;
+  bool    wifiVar;
+  uint8_t ipSonOktet;
+};
+
+// Metni tam 16 karaktere padle/kırp (sağ boşluk). out en az 17 bayt.
+inline void pad16(const char* src, char* out) {
+  snprintf(out, 17, "%-16.16s", src);
+}
+
+// Sayfaya göre iki LCD satırını (tam 16 karakter, padded) üretir. Donanım YOK.
+inline void sayfaSatirlari(const EkranVerisi& d, Sayfa sayfa, char l1[17], char l2[17]) {
+  char a[24], b[24];
+  switch (sayfa) {
+    case Sayfa::IKLIM:
+      if (d.dhtArizali) snprintf(a, sizeof(a), "SENSOR HATASI");
+      else              snprintf(a, sizeof(a), "T:%.1fC H:%d%%", d.sicaklik, (int)d.nem);
+      snprintf(b, sizeof(b), "Fan:%-4s LED:%d", d.fanAcik ? "ACIK" : "KAPA", d.ledParlaklik);
+      break;
+    case Sayfa::TOPRAK:
+      snprintf(a, sizeof(a), "Toprak: %d%%", d.toprakYuzde);
+      if (d.pompaCalisiyor) snprintf(b, sizeof(b), "Sulaniyor %ds", d.pompaKalanSn);
+      else                  snprintf(b, sizeof(b), "Pompa: KAPALI");
+      break;
+    case Sayfa::SISTEM:
+    default:
+      if (d.wifiVar) snprintf(a, sizeof(a), "WiFi:OK .%d", d.ipSonOktet);
+      else           snprintf(a, sizeof(a), "WiFi:YOK");
+      snprintf(b, sizeof(b), "akillisera.local");
+      break;
+  }
+  pad16(a, l1);
+  pad16(b, l2);
+}
 
 // Yardımcı: 0-255 aralığına kırp.
 inline int kirp255(int v) {
@@ -42,6 +90,32 @@ inline bool pompaTetiklenebilir(uint32_t simdi, uint32_t sonBitis, bool suAnAcik
   if (suAnAcik) return false;
   if ((uint32_t)(simdi - sonBitis) < WATERING_COOLDOWN) return false;
   return true;
+}
+
+// Buton debounce durumu (INPUT_PULLUP: basılı = false).
+struct ButonDurumu {
+  bool sonOkuma;             // pinin son ham okuması
+  bool kararliDurum;         // debounce sonrası kararlı durum
+  unsigned long sonDegisim;  // son ham değişim anı
+};
+
+// Buton debounce. Dönüş: kararlı durum AZ ÖNCE değişti mi (evet -> true).
+// uint32_t çıkarma millis() taşmasını tolere eder.
+inline bool butonGuncelle(ButonDurumu& d, bool hamOkuma, unsigned long simdi) {
+  if (hamOkuma != d.sonOkuma) {
+    d.sonDegisim = simdi;
+    d.sonOkuma = hamOkuma;
+  }
+  if ((uint32_t)(simdi - d.sonDegisim) >= BUTTON_DEBOUNCE_MS && hamOkuma != d.kararliDurum) {
+    d.kararliDurum = hamOkuma;
+    return true;
+  }
+  return false;
+}
+
+// INPUT_PULLUP ters mantığını burada kapsülle: kararlı LOW (false) = basılı.
+inline bool butonBasildi(const ButonDurumu& d) {
+  return d.kararliDurum == false;
 }
 
 // 3. Fan histerezisi. Bant içindeyken önceki durum korunur (röle çatırdaması önlenir).
