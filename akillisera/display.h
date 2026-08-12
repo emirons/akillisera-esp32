@@ -35,7 +35,8 @@ inline Sayfa mevcutSayfa() { return s_sayfa; }
 // Zaten 16 karaktere padlenmiş satırı yaz; öncekiyle aynıysa YAZMA (I2C tasarrufu).
 inline void satiriYaz(uint8_t row, const char* padli16) {
   if (strcmp(padli16, s_onceki[row]) == 0) return;
-  strcpy(s_onceki[row], padli16);
+  strncpy(s_onceki[row], padli16, 16);   // padli16 daima 16 char (pad16); yine de bounded
+  s_onceki[row][16] = '\0';
   s_lcd.setCursor(0, row);
   s_lcd.print(padli16);
 }

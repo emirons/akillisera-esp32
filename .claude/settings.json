@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "in=$(cat); echo \"$in\" | grep -qE '\"file_path\"[^}]*akillisera/[^\"]*\\.(ino|h)\"' && arduino-cli compile --fqbn esp32:esp32:nodemcu-32s --output-dir build akillisera/ 2>&1 | tail -25 || true"
+            "command": "in=$(cat); echo \"$in\" | grep -qE '\"file_path\"[^}]*akillisera/[^\"]*\\.(ino|h)\"' && arduino-cli compile --fqbn esp32:esp32:nodemcu-32s --build-property build.partitions=huge_app --build-property upload.maximum_size=3145728 --output-dir build akillisera/ 2>&1 | tail -25 || true"
           }
         ]
       }
