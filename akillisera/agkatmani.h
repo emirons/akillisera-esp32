@@ -19,21 +19,12 @@
 #include <ArduinoJson.h>
 #include "config.h"
 #include "control_logic.h"
+#include "kontrol_durumu.h"
 #include "actuators.h"
 #include "zaman.h"
 #include "sulama_plani.h"
 #include "web_ui.h"
 #include "secrets.h"
-
-// loop -> API'ye taşınan anlık durum (JSON /api/durum için).
-struct DurumKaydi {
-  float sicaklik, nem;
-  int   toprakHam, toprakYuzde, isikHam, isikYuzde;
-  bool  pompa, fan;
-  int   led;
-  bool  alarm, dhtGecerli;
-  int   dhtHata;
-};
 
 enum class AgDurumu { BASLATILMADI, BAGLANIYOR, BAGLI, HATA };
 
@@ -44,27 +35,20 @@ static unsigned long s_baglanmaBaslangic = 0;
 static unsigned long s_sonYenidenDeneme = 0;
 static bool          s_sunucuBasladi = false;
 
-// Paylaşılan kontrol durumu (API <-> loop). Her özellik BAĞIMSIZ oto/manuel:
-// kullanıcı fanı otomatik tutup LED'i manuel ayarlayabilir (veya tersi).
-static bool s_fanOto    = true;   // fan: true=sensör karar verir, false=manuel
-static bool s_ledOto    = true;   // LED: true=ışığa göre, false=manuel parlaklık
-static bool s_manuelFan = false;
-static int  s_manuelLed = 0;
-static DurumKaydi s_durum = {};
+// Kontrol durumu (fan/LED modları, durum snapshot) kontrol_durumu.h'da (kd*).
 
 // Zaman sabitleri
 constexpr unsigned long WIFI_BAGLANTI_ZAMANASIMI = 20000UL;  // 20 sn bağlanamazsa HATA
 constexpr unsigned long WIFI_YENIDEN_DENEME       = 30000UL;  // 30 sn sonra tekrar dene
 constexpr size_t        MAKS_GOVDE_BAYT           = 512;      // istek gövdesi üst sınır
 
-// --- Loop'un okuyacağı erişimciler ---
-inline bool    agFanOto()      { return s_fanOto; }
-inline bool    agLedOto()      { return s_ledOto; }
-inline bool    agManuelFan()   { return s_manuelFan; }
-inline int     agManuelLed()   { return s_manuelLed; }
+// --- Loop'un okuyacağı erişimciler (kontrol durumu kd* delege) ---
+inline bool    agFanOto()      { return kdFanOto(); }
+inline bool    agLedOto()      { return kdLedOto(); }
+inline bool    agManuelFan()   { return kdManuelFan(); }
+inline int     agManuelLed()   { return kdManuelLed(); }
 inline bool    agBagli()       { return s_agDurumu == AgDurumu::BAGLI; }
 inline uint8_t agIpSonOktet()  { return agBagli() ? WiFi.localIP()[3] : 0; }
-inline void    agDurumGuncelle(const DurumKaydi& d) { s_durum = d; }
 
 // --- Yardımcılar ---
 // Yanıt başlıkları: nosniff (MIME sniff/XSS savunması, ucuz) + CORS.
@@ -106,20 +90,21 @@ inline void handleRoot() {
 }
 
 inline void handleDurum() {
+  const DurumKaydi& d = kdDurum();
   JsonDocument doc;
-  doc["sicaklik"]      = s_durum.sicaklik;
-  doc["nem"]           = s_durum.nem;
-  doc["toprakHam"]     = s_durum.toprakHam;
-  doc["toprakYuzde"]   = s_durum.toprakYuzde;
-  doc["isikHam"]       = s_durum.isikHam;
-  doc["isikYuzde"]     = s_durum.isikYuzde;
-  doc["pompa"]         = s_durum.pompa;
-  doc["fan"]           = s_durum.fan;
-  doc["led"]           = s_durum.led;
-  doc["alarm"]         = s_durum.alarm;
-  doc["fanOto"]        = s_fanOto;
-  doc["ledOto"]        = s_ledOto;
-  doc["dhtGecerli"]    = s_durum.dhtGecerli;
+  doc["sicaklik"]      = d.sicaklik;
+  doc["nem"]           = d.nem;
+  doc["toprakHam"]     = d.toprakHam;
+  doc["toprakYuzde"]   = d.toprakYuzde;
+  doc["isikHam"]       = d.isikHam;
+  doc["isikYuzde"]     = d.isikYuzde;
+  doc["pompa"]         = d.pompa;
+  doc["fan"]           = d.fan;
+  doc["led"]           = d.led;
+  doc["alarm"]         = d.alarm;
+  doc["fanOto"]        = kdFanOto();
+  doc["ledOto"]        = kdLedOto();
+  doc["dhtGecerli"]    = d.dhtGecerli;
   doc["rssi"]          = WiFi.RSSI();
   char sbuf[12]; zamanMetni(sbuf, sizeof(sbuf));
   doc["saat"]          = sbuf;
@@ -175,8 +160,7 @@ inline void handleFan() {
   JsonDocument doc;
   if (!govdeyiAl(doc)) return;
   if (!doc["acik"].is<bool>()) { jsonHata(400, "acik bool olmali"); return; }
-  s_manuelFan = doc["acik"];
-  s_fanOto = false;                  // fanı elle ayarlamak fanı manuel moda alır
+  kdFanElle(doc["acik"]);            // manuel fan + fanı otomatik dışına al
   jsonOk("Fan ayarlandi");
 }
 
@@ -186,8 +170,7 @@ inline void handleLed() {
   if (!doc["parlaklik"].is<int>()) { jsonHata(400, "parlaklik sayi olmali"); return; }
   int p = doc["parlaklik"];
   if (!parlaklikGecerliMi(p)) { jsonHata(400, "parlaklik 0-255 araliginda olmali"); return; }
-  s_manuelLed = p;
-  s_ledOto = false;                  // LED'i elle ayarlamak LED'i manuel moda alır
+  kdLedElle(p);                      // manuel LED + LED'i otomatik dışına al
   jsonOk("LED ayarlandi");
 }
 
@@ -197,8 +180,8 @@ inline void handleMod() {
   JsonDocument doc;
   if (!govdeyiAl(doc)) return;
   bool degisti = false;
-  if (doc["fan"].is<bool>()) { s_fanOto = doc["fan"]; degisti = true; }
-  if (doc["led"].is<bool>()) { s_ledOto = doc["led"]; degisti = true; }
+  if (doc["fan"].is<bool>()) { kdFanOtoAyarla(doc["fan"]); degisti = true; }
+  if (doc["led"].is<bool>()) { kdLedOtoAyarla(doc["led"]); degisti = true; }
   if (!degisti) { jsonHata(400, "fan veya led (bool) gerekli"); return; }
   jsonOk("Mod ayarlandi");
 }
@@ -208,7 +191,7 @@ inline void handleSaglik() {
   doc["calismaSuresi"] = millis();
   doc["bosHeap"]       = ESP.getFreeHeap();
   doc["rssi"]          = WiFi.RSSI();
-  doc["dhtHata"]       = s_durum.dhtHata;
+  doc["dhtHata"]       = kdDurum().dhtHata;
   doc["agDurumu"]      = agBagli() ? "BAGLI" : "OTONOM";
   String cikti;
   serializeJson(doc, cikti);

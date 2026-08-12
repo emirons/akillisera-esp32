@@ -142,6 +142,32 @@ inline bool parlaklikGecerliMi(int deger) {
   return deger >= 0 && deger <= 255;
 }
 
+// 5c. ThingSpeak API bütçesi: bir aralıkla günde kaç istek atılır?
+// static_assert (config bölümünde) günlük ~8000 limitini derleme anında korur.
+constexpr int gunlukIstekSayisi(unsigned long aralikMs) {
+  return (int)(86400000UL / aralikMs);
+}
+// Biri aralığı 15 sn'ye düşürürse (5760+5760=11520>8000) DERLEME durur.
+// Hata günlerce fark edilmez bir kota aşımı yerine anında yakalanır.
+static_assert(gunlukIstekSayisi(CLOUD_INTERVAL) + gunlukIstekSayisi(TALKBACK_INTERVAL) < 8000,
+              "ThingSpeak gunluk istek limiti asiliyor - araliklari artirin");
+
+// 5d. Metni yerinde kırp: baştaki/sondaki boşluk, \r, \n, \t temizler.
+// TalkBack yanıtı "SULA\r\n" gibi gelebilir; komutAyristir öncesi çağrılır.
+inline void metniKirp(char* s) {
+  if (s == nullptr) return;
+  char* bas = s;
+  while (*bas == ' ' || *bas == '\t' || *bas == '\r' || *bas == '\n') bas++;
+  int n = (int)std::strlen(bas);
+  while (n > 0) {
+    char c = bas[n - 1];
+    if (c == ' ' || c == '\t' || c == '\r' || c == '\n') n--;
+    else break;
+  }
+  for (int i = 0; i < n; i++) s[i] = bas[i];
+  s[n] = '\0';
+}
+
 // --- Zamanlı sulama (saf mantık, host'ta test edilir) ---
 // Her gün tekrarlı sulama saati. Donanım/NTP bağımsız düz veri.
 struct SulamaZamani { uint8_t saat; uint8_t dakika; };
