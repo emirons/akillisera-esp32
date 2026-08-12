@@ -88,13 +88,21 @@ canvas{width:100%;height:180px;display:block}
       <div class="card"><h2>Soil Moisture</h2><div><span class="big" id="top">--</span><span class="unit"> %</span></div><div class="bar"><i id="topb"></i></div></div>
       <div class="card"><h2>Light</h2><div><span class="big" id="isk">--</span><span class="unit"> %</span></div><div class="bar"><i id="iskb"></i></div></div>
     </div>
-    <div class="ctrl"><button class="primary" id="sula" onclick="sula()">WATER (5s)</button></div>
+    <div class="ctrl">
+      <div class="row"><span class="lbl">Watering</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="smodt" class="val">Auto</span>
+          <div class="tg" id="smod" role="switch" aria-checked="false" tabindex="0" aria-label="Watering auto or manual" onclick="smod()" onkeydown="if(event.key==' '||event.key=='Enter'){event.preventDefault();smod()}"></div>
+        </div>
+      </div>
+      <div class="row" id="sularow"><button class="primary" id="sula" onclick="sula()" style="width:100%">WATER (5s)</button></div>
+    </div>
     <div class="ctrl">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <span class="lbl">Scheduled Watering</span><span class="val" id="saat">--:--:--</span>
+        <span class="lbl" id="schedttl">Scheduled Watering</span><span class="val" id="saat">--:--:--</span>
       </div>
       <ul id="plan"></ul>
-      <div style="display:flex;gap:10px">
+      <div id="addform" style="display:flex;gap:10px">
         <input type="time" id="yenizaman" value="08:00" aria-label="New watering time">
         <button onclick="planEkle()">Add</button>
       </div>
@@ -163,7 +171,7 @@ canvas{width:100%;height:180px;display:block}
 <script>
 // Fan and LED are INDEPENDENT (each has its own auto/manual). Slider posts only
 // on release (change), never while dragging, so the ESP32 isn't flooded.
-var fanOto=true, ledOto=true, hataSay=0;
+var fanOto=true, ledOto=true, sulamaOto=true, hataSay=0;
 var hist={t:[],h:[],s:[]}, HMAX=60;
 var acc={n:0,fan:0,led:0,pump:0}, planList=[], bitki='custom';
 // Bitki bilgi tabanı — bahçecilik referanslarından derlenmiş ideal aralıklar +
@@ -189,6 +197,24 @@ async function post(u,b){try{await fetch(u,{method:'POST',body:JSON.stringify(b)
 function sula(){var b=q('sula');post('/api/sula',{});var n=5;b.disabled=true;b.textContent='Watering '+n+'s';var t=setInterval(function(){n--;if(n<=0){clearInterval(t);b.disabled=false;b.textContent='WATER (5s)';}else b.textContent='Watering '+n+'s';},1000);}
 function fmod(){post('/api/mod',{fan:!fanOto});}
 function lmod(){post('/api/mod',{led:!ledOto});}
+function smod(){post('/api/mod',{sulama:!sulamaOto});}
+// Sulama modu görünümü: OTO -> WATER+ekleme soluk, plan = bitki optimum saatleri
+// (salt-okunur). MANUEL -> WATER+ekleme aktif, plan = kullanıcı planı.
+function renderSulama(d){
+  sulamaOto=d.sulamaOto;
+  q('smod').setAttribute('aria-checked',sulamaOto?'false':'true');
+  q('smodt').textContent=sulamaOto?'Auto':'Manual';
+  q('sularow').className='row'+(sulamaOto?' disabled':'');
+  q('addform').style.display=sulamaOto?'none':'flex';
+  q('schedttl').textContent=sulamaOto?'Optimal Times ('+aktifBitki().name+')':'Scheduled Watering';
+  if(sulamaOto){
+    var arr=d.otoSulama||[];planList=arr;var u=q('plan');u.innerHTML='';
+    if(!arr.length){u.innerHTML='<li style="color:var(--mut);padding:6px 0">No auto times</li>';return;}
+    arr.forEach(function(z){var li=document.createElement('li');li.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--ln)';
+      var t=document.createElement('span');t.style.fontSize='18px';t.textContent=('0'+z.saat).slice(-2)+':'+('0'+z.dakika).slice(-2);
+      var b=document.createElement('span');b.className='val';b.textContent='auto';li.appendChild(t);li.appendChild(b);u.appendChild(li);});
+  }else{planCek();}
+}
 function fan(){if(fanOto)return;post('/api/fan',{acik:q('fan').getAttribute('aria-checked')!='true'});}
 function ledGonder(v){if(ledOto)return;post('/api/led',{parlaklik:parseInt(v)});}
 function modGorunum(){
@@ -279,6 +305,7 @@ async function durumCek(){
     var ls=q('led');if(document.activeElement!==ls){ls.value=d.led;q('ledv').textContent=d.led;}
     fanOto=d.fanOto;ledOto=d.ledOto;modGorunum();
     if(d.bitki)bitki=d.bitki;var bs=q('bitki');if(bs&&bs.value!=bitki)bs.value=bitki;
+    renderSulama(d);
     q('saat').textContent=d.saat||'--:--:--';
     q('up').textContent='Uptime: '+Math.floor(d.calismaSuresi/1000)+'s';
     q('rssi').textContent='Signal: '+(d.rssi||'--')+' dBm';
@@ -287,7 +314,7 @@ async function durumCek(){
     pushHist(d);drawChart();insights(d);renderRanges(d);renderActivity(d);renderTS(d.tsKanal);
   }catch(e){hataSay++;q('dot').className='dot';q('stt').textContent='No connection';}
 }
-bitkiDoldur();durumCek();planCek();setInterval(durumCek,2000);
+bitkiDoldur();durumCek();setInterval(durumCek,2000);
 addEventListener('resize',drawChart);
 </script>
 </body>
