@@ -1,5 +1,5 @@
 // akillisera.ino — ESP32 Akıllı Sera firmware orkestrasyonu
-// Faz 6: WiFi + mDNS + WebServer. loop()'ta delay()/while-bekleme YOK.
+// Otonom kontrol SEÇİLİ BİTKİYE göre (bitki_veri.h). loop()'ta delay/while YOK.
 
 #include "config.h"
 #include "control_logic.h"
@@ -16,7 +16,7 @@ void setup() {
   sensorlerBaslat();
   butonlariBaslat();
   ekraniBaslat();
-  planBaslat();           // zamanlı sulama planını flash'tan yükle
+  planBaslat();           // kullanıcı sulama planını flash'tan yükle
   bitkiYukle();            // seçili bitki türünü flash'tan yükle
   agBaslat();             // bloklamaz — bağlantı arka planda
   Serial.println(F("Akilli Sera — ag katmani hazir"));
@@ -24,13 +24,19 @@ void setup() {
 
 void loop() {
   unsigned long simdi = millis();
+  const BitkiParam& bp = bitkiParam(bitkiAl());   // seçili bitkinin kontrol eşikleri
 
-  // Ağ + pompa + butonlar: her turda, gecikmesiz.
+  // Ağ + bulut + pompa: her turda, gecikmesiz.
   agGuncelle(simdi);
   agIsle();
-  bulutGuncelle(simdi);     // ThingSpeak gönderim + TalkBack (30 sn, WiFi varsa)
-  planGuncelle(simdi);      // zamanlı sulama — saat plana denk gelince tetikler
+  bulutGuncelle(simdi);
   pompayiGuncelle(simdi);
+
+  // SULAMA modu: OTO = bitkinin optimum saatleri; MANUEL = kullanıcı planı.
+  // Manuel WATER butonu her koşulda çalışır (elle sulama).
+  if (kdSulamaOto()) bitkiOtoSulamaIsle(bp.otoSulama, bp.otoSulamaAdet, simdi);
+  else               planGuncelle(simdi);
+
   if (sayfaButonunaBasildi(simdi))  sayfaDegistir();
   if (sulamaButonunaBasildi(simdi)) pompayiTetikle(simdi);
 
@@ -42,30 +48,31 @@ void loop() {
   if (simdi - sonSensorOkuma >= SENSOR_READ_INTERVAL) {
     sonSensorOkuma = simdi;
     SensorVerisi v = tumSensorleriOku();
+    int toprakY = toprakNemYuzde(v.toprakHam);
+    int isikY   = isikYuzde(v.isikHam);
 
-    // Otomatik sulama her zaman aktif (güvenlik kilidi 60 sn içeride).
-    // Manuel sulama buton/API'den her koşulda çalışır.
-    if (sulamaGerekli(v.toprakHam, pompaCalisiyor()))
+    // OTO sulama modunda toprak-eşiği güvenlik sulaması (bitkiye özel %).
+    if (kdSulamaOto() && sulamaGerekliYuzde(toprakY, bp.soilDryYuzde, pompaCalisiyor()))
       pompayiTetikle(simdi);
 
-    // Fan: bağımsız oto/manuel.
+    // Fan: bitki histerezis eşikleriyle (oto), yoksa manuel.
     if (agFanOto()) {
-      fanDurum      = fanKarari(v.nem, v.sicaklik, fanDurum);
+      fanDurum      = fanKarari(v.nem, v.sicaklik, fanDurum, bp.humHigh, bp.humLow, bp.tempHigh);
       karar.fanAcik = fanDurum;
     } else {
       karar.fanAcik = agManuelFan();
     }
 
-    // LED: bağımsız oto/manuel.
-    if (agLedOto()) karar.ledParlaklik = ledParlaklikKarari(v.isikHam, false, 0);
+    // LED: bitki ışık eşiği % (oto), yoksa manuel parlaklık.
+    if (agLedOto()) karar.ledParlaklik = (isikY < bp.lightLowYuzde) ? LED_BRIGHTNESS : 0;
     else            karar.ledParlaklik = ledParlaklikKarari(0, true, agManuelLed());
 
-    karar.alarmAktif = alarmKarari(v.sicaklik);      // alarm her koşulda güvenlik
+    karar.alarmAktif = alarmKarari(v.sicaklik, bp.tempHigh);   // bitki sıcaklık eşiği
 
     // Ekran + API durum snapshot
     ekran.sicaklik    = v.sicaklik;
     ekran.nem         = v.nem;
-    ekran.toprakYuzde = toprakNemYuzde(v.toprakHam);
+    ekran.toprakYuzde = toprakY;
     ekran.fanAcik     = karar.fanAcik;
     ekran.ledParlaklik = karar.ledParlaklik;
     ekran.dhtArizali  = !v.dhtGecerli;
@@ -74,8 +81,8 @@ void loop() {
 
     DurumKaydi dk;
     dk.sicaklik = v.sicaklik; dk.nem = v.nem;
-    dk.toprakHam = v.toprakHam; dk.toprakYuzde = ekran.toprakYuzde;
-    dk.isikHam = v.isikHam;     dk.isikYuzde = isikYuzde(v.isikHam);
+    dk.toprakHam = v.toprakHam; dk.toprakYuzde = toprakY;
+    dk.isikHam = v.isikHam;     dk.isikYuzde = isikY;
     dk.pompa = pompaCalisiyor(); dk.fan = karar.fanAcik; dk.led = karar.ledParlaklik;
     dk.alarm = karar.alarmAktif; dk.dhtGecerli = v.dhtGecerli; dk.dhtHata = dhtHataSayisi();
     kdDurumGuncelle(dk);

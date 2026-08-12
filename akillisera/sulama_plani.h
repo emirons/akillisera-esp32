@@ -57,15 +57,27 @@ inline bool planSil(int index) {
   return true;
 }
 
-// Her loop turunda çağrılır. Saat bir plana denk gelince günde/dakikada bir kez
-// pompayı tetikler (60 sn güvenlik kilidi ayrıca korur). NTP yoksa hiçbir şey yapmaz.
-inline void planGuncelle(unsigned long simdi) {
+// Ortak: verilen zaman listesi saate denk gelince günde/dakikada bir kez tetikler.
+// (60 sn kilit ayrıca korur.) NTP yoksa pas geçer. sonKey mükerrer tetiği önler.
+inline void zamanliSulamaIsle(const SulamaZamani* liste, int adet,
+                              unsigned long simdi, int& sonKey) {
   int saat, dakika, saniye;
-  if (!suankiZaman(saat, dakika, saniye)) return;   // saat senkron değil -> pas
+  if (!suankiZaman(saat, dakika, saniye)) return;
   int anahtar = saat * 60 + dakika;
-  if (anahtar == s_sonTetikDakika) return;          // bu dakika zaten işlendi
-  if (sulamaZamaniEslesme(s_plan, s_planAdet, saat, dakika) >= 0) {
+  if (anahtar == sonKey) return;
+  if (sulamaZamaniEslesme(liste, adet, saat, dakika) >= 0) {
     pompayiTetikle(simdi);
-    s_sonTetikDakika = anahtar;
+    sonKey = anahtar;
   }
+}
+
+// Kullanıcı planı (MANUEL sulama modunda çağrılır).
+inline void planGuncelle(unsigned long simdi) {
+  zamanliSulamaIsle(s_plan, s_planAdet, simdi, s_sonTetikDakika);
+}
+
+// Bitki optimum saatleri (OTO sulama modunda çağrılır) — ayrı mükerrer-koruma.
+static int s_bitkiSonTetik = -1;
+inline void bitkiOtoSulamaIsle(const SulamaZamani* liste, int adet, unsigned long simdi) {
+  zamanliSulamaIsle(liste, adet, simdi, s_bitkiSonTetik);
 }
