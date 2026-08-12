@@ -169,3 +169,33 @@ TEST_CASE("komutAyristir: bos metin -> YOK") {
 TEST_CASE("komutAyristir: nullptr -> YOK") {
   CHECK(komutAyristir(nullptr).komut == Komut::YOK);
 }
+
+// ---------------------------------------------------------------------------
+// 8. pompaTetiklenebilir — sulama güvenlik kilidi (WATERING_COOLDOWN 60000)
+// ---------------------------------------------------------------------------
+TEST_CASE("pompaTetiklenebilir: pompa zaten acik -> reddet") {
+  CHECK(pompaTetiklenebilir(100000u, 0u, true) == false);
+}
+TEST_CASE("pompaTetiklenebilir: soguma dolmadi (59 sn) -> reddet") {
+  CHECK(pompaTetiklenebilir(59000u, 0u, false) == false);
+}
+TEST_CASE("pompaTetiklenebilir: soguma tam siniri (60 sn) -> izin") {
+  CHECK(pompaTetiklenebilir(60000u, 0u, false) == true);
+}
+TEST_CASE("pompaTetiklenebilir: soguma gecti (61 sn) -> izin") {
+  CHECK(pompaTetiklenebilir(61000u, 0u, false) == true);
+}
+TEST_CASE("pompaTetiklenebilir: ilk tetikleme, sonBitis 0, cok sonra -> izin") {
+  CHECK(pompaTetiklenebilir(500000u, 0u, false) == true);
+}
+TEST_CASE("pompaTetiklenebilir: millis tasmasi, gecen 60 sn -> izin") {
+  // sonBitis 0xFFFF0000, simdi wrap sonrasi: gecen tam 60000
+  uint32_t sonBitis = 0xFFFF0000u;
+  uint32_t simdi = sonBitis + 60000u;  // uint32 wrap
+  CHECK(pompaTetiklenebilir(simdi, sonBitis, false) == true);
+}
+TEST_CASE("pompaTetiklenebilir: millis tasmasi, gecen 59 sn -> reddet") {
+  uint32_t sonBitis = 0xFFFF0000u;
+  uint32_t simdi = sonBitis + 59000u;
+  CHECK(pompaTetiklenebilir(simdi, sonBitis, false) == false);
+}
