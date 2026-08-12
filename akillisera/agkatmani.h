@@ -24,6 +24,7 @@
 #include "zaman.h"
 #include "sulama_plani.h"
 #include "bitki.h"
+#include "bitki_veri.h"
 #include "web_ui.h"
 #include "secrets.h"
 
@@ -105,6 +106,15 @@ inline void handleDurum() {
   doc["alarm"]         = d.alarm;
   doc["fanOto"]        = kdFanOto();
   doc["ledOto"]        = kdLedOto();
+  doc["sulamaOto"]     = kdSulamaOto();
+  // AUTO sulama modunda o bitkinin optimum saatleri (UI'de göstermek için)
+  const BitkiParam& bp = bitkiParam(bitkiAl());
+  JsonArray os = doc["otoSulama"].to<JsonArray>();
+  for (int i = 0; i < bp.otoSulamaAdet; i++) {
+    JsonObject o = os.add<JsonObject>();
+    o["saat"] = bp.otoSulama[i].saat;
+    o["dakika"] = bp.otoSulama[i].dakika;
+  }
   doc["dhtGecerli"]    = d.dhtGecerli;
   doc["rssi"]          = WiFi.RSSI();
   doc["tsKanal"]       = TS_CHANNEL_ID;   // public channel ID (write key gizli kalır)
@@ -202,9 +212,10 @@ inline void handleMod() {
   JsonDocument doc;
   if (!govdeyiAl(doc)) return;
   bool degisti = false;
-  if (doc["fan"].is<bool>()) { kdFanOtoAyarla(doc["fan"]); degisti = true; }
-  if (doc["led"].is<bool>()) { kdLedOtoAyarla(doc["led"]); degisti = true; }
-  if (!degisti) { jsonHata(400, "fan veya led (bool) gerekli"); return; }
+  if (doc["fan"].is<bool>())    { kdFanOtoAyarla(doc["fan"]);    degisti = true; }
+  if (doc["led"].is<bool>())    { kdLedOtoAyarla(doc["led"]);    degisti = true; }
+  if (doc["sulama"].is<bool>()) { kdSulamaOtoAyarla(doc["sulama"]); degisti = true; }
+  if (!degisti) { jsonHata(400, "fan, led veya sulama (bool) gerekli"); return; }
   jsonOk("Mod ayarlandi");
 }
 
