@@ -23,6 +23,7 @@ void setup() {
 }
 
 void loop() {
+  unsigned long loopBasla = micros();
   unsigned long simdi = millis();
   const BitkiParam& bp = bitkiParam(bitkiAl());   // seçili bitkinin kontrol eşikleri
 
@@ -93,4 +94,6 @@ void loop() {
 
   eyleyicileriUygula(karar, simdi);
   ekraniGuncelle(ekran, simdi);
+
+  kdLoopKaydet(micros() - loopBasla);   // en yüksek loop süresi (/api/saglik)
 }
