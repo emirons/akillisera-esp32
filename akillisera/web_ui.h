@@ -73,6 +73,12 @@ canvas{width:100%;height:180px;display:block}
   </div>
 </div>
 
+<div class="ctrl" style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+  <span class="lbl">Plant / Crop</span>
+  <select id="bitki" aria-label="Select plant" onchange="bitkiSec(this.value)"
+    style="min-height:44px;flex:0 1 240px;background:var(--ln);color:var(--tx);border:1px solid var(--ln);border-radius:10px;padding:0 10px;font:inherit"></select>
+</div>
+
 <div class="wrap">
   <!-- LEFT COLUMN -->
   <div class="col">
@@ -159,7 +165,24 @@ canvas{width:100%;height:180px;display:block}
 // on release (change), never while dragging, so the ESP32 isn't flooded.
 var fanOto=true, ledOto=true, hataSay=0;
 var hist={t:[],h:[],s:[]}, HMAX=60;
-var acc={n:0,fan:0,led:0,pump:0}, planList=[];
+var acc={n:0,fan:0,led:0,pump:0}, planList=[], bitki='custom';
+// Bitki bilgi tabanı — bahçecilik referanslarından derlenmiş ideal aralıklar +
+// bayraklar (kombinasyon önerileri için) + kısa bakım notu. Genişletilebilir
+// (ileride harici bir API/kaynaktan da beslenebilir). t/h/s/l = [min,max].
+var PLANTS={
+ custom:{name:'Custom / General',t:[18,28],h:[40,70],s:[40,80],l:[30,80],f:{},tip:'General ranges. Pick a plant for tailored advice.'},
+ tomato:{name:'Tomato',t:[18,27],h:[50,70],s:[50,75],l:[60,90],f:{humid:1,light:1,warm:1},tip:'Steady moisture, strong light, good airflow.'},
+ lettuce:{name:'Lettuce',t:[10,20],h:[50,70],s:[60,80],l:[40,70],f:{cool:1,thirsty:1},tip:'Cool-season; keep soil moist, avoid heat (bolting).'},
+ pepper:{name:'Pepper',t:[20,30],h:[50,70],s:[45,70],l:[60,95],f:{light:1,warm:1},tip:'Warm and bright; let soil dry slightly between waterings.'},
+ cucumber:{name:'Cucumber',t:[20,28],h:[60,80],s:[60,85],l:[60,90],f:{humid:1,thirsty:1,warm:1},tip:'Loves warmth and humidity; water generously.'},
+ basil:{name:'Basil',t:[18,28],h:[40,60],s:[40,65],l:[55,90],f:{light:1,warm:1},tip:'Bright light; avoid soggy soil (dislikes wet feet).'},
+ strawberry:{name:'Strawberry',t:[15,24],h:[50,70],s:[50,75],l:[55,90],f:{light:1},tip:'Moderate temps, steady moisture, good light.'},
+ spinach:{name:'Spinach',t:[10,22],h:[50,70],s:[55,80],l:[40,70],f:{cool:1,thirsty:1},tip:'Cool-season; bolts in heat, keep soil moist.'}
+};
+function aktifBitki(){return PLANTS[bitki]||PLANTS.custom;}
+function trend(a){var v=a.filter(function(x){return x!=null;});if(v.length<4)return 0;return v[v.length-1]-v[Math.max(0,v.length-10)];}
+async function bitkiSec(k){bitki=k;try{await fetch('/api/bitki',{method:'POST',body:JSON.stringify({bitki:k})});}catch(e){}durumCek();}
+function bitkiDoldur(){var s=q('bitki');if(s.options.length)return;var h='';for(var k in PLANTS)h+='<option value="'+k+'">'+PLANTS[k].name+'</option>';s.innerHTML=h;}
 function q(i){return document.getElementById(i)}
 function tema(){var r=document.documentElement;var cur=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');var nx=cur=='dark'?'light':'dark';r.setAttribute('data-theme',nx);q('tbtn').innerHTML=nx=='dark'?'&#9788;':'&#9789;';drawChart();}
 async function post(u,b){try{await fetch(u,{method:'POST',body:JSON.stringify(b)});}catch(e){}await durumCek();}
@@ -198,14 +221,25 @@ function drawChart(){var cv=q('chart');if(!cv)return;var W=cv.clientWidth||600,H
   var c=cv.getContext('2d');var g=getComputedStyle(document.documentElement).getPropertyValue('--ln');
   c.clearRect(0,0,W,H);c.strokeStyle=g;c.lineWidth=1;for(var k=1;k<4;k++){var y=k/4*H;c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke();}
   line(c,hist.t,'#ff7a45',0,50,W,H);line(c,hist.h,'#43a3ff',0,100,W,H);line(c,hist.s,'#43d17a',0,100,W,H);}
-function insights(d){var out=[];
-  if(d.alarm)out.push(['&#9888;','High temperature alarm — ventilation active. Check greenhouse cooling.']);
+// Öneri motoru: Condition Ranges (bitki ideal aralığı) + History trend + bitki
+// bilgi tabanı bayraklarının BİRLEŞİMİnden özgün, kombinasyona özel tavsiyeler.
+function insights(d){var P=aktifBitki(),f=P.f||{},out=[];
+  if(d.alarm)out.push(['&#9888;','High-temperature alarm — ventilation active. Check greenhouse cooling.']);
   if(!d.dhtGecerli)out.push(['&#9888;','Temperature/humidity sensor fault — readings unavailable.']);
-  if(d.dhtGecerli&&d.sicaklik>30&&!d.alarm)out.push(['&#127777;','Temperature rising — monitor ventilation.']);
-  if(d.dhtGecerli&&d.nem>70)out.push(['&#128167;','High humidity — extra ventilation recommended to prevent mold.']);
-  if(d.toprakYuzde<30)out.push(['&#127793;','Soil is dry — watering recommended (auto/scheduled will handle it).']);
-  if(d.isikYuzde<25)out.push(['&#128161;','Low light — supplemental grow light recommended.']);
-  if(!out.length)out.push(['&#9989;','All conditions are optimal.']);
+  // Bitkiye özel aralık kontrolleri
+  function rng(v,r,unit,lbl,lo,hi){if(v<r[0])out.push(['&#9660;',lbl+' '+v+unit+' is below '+P.name+' ideal '+r[0]+'-'+r[1]+unit+'. '+lo]);else if(v>r[1])out.push(['&#9650;',lbl+' '+v+unit+' is above '+P.name+' ideal '+r[0]+'-'+r[1]+unit+'. '+hi]);}
+  if(d.dhtGecerli){rng(Math.round(d.sicaklik),P.t,'°C','Temperature','Add warmth or cut ventilation.','Increase ventilation or shade.');rng(Math.round(d.nem),P.h,'%','Humidity','Mist or reduce airflow.','Ventilate to lower humidity.');}
+  rng(d.toprakYuzde,P.s,'%','Soil moisture','Water now.','Ease off watering — root-rot risk.');
+  rng(d.isikYuzde,P.l,'%','Light','Add grow light.','Provide shade.');
+  // Kombinasyon + trend -> bitkiye özgü öneriler
+  var tT=trend(hist.t),sT=trend(hist.s);
+  if(f.humid&&d.dhtGecerli&&d.nem>P.h[1]&&d.sicaklik>=(P.t[0]+P.t[1])/2)out.push(['&#9888;','Warm + humid air raises fungal-disease risk for '+P.name+'. Boost airflow and keep foliage dry.']);
+  if(f.cool&&d.dhtGecerli&&d.sicaklik>P.t[1])out.push(['&#9888;',P.name+' is a cool-season crop — sustained heat triggers bolting. Ventilate or shade now.']);
+  if(f.warm&&d.dhtGecerli&&d.sicaklik<P.t[0])out.push(['&#10052;',P.name+' prefers warmth — current temperature is too low; add heat or reduce venting.']);
+  if(f.light&&d.isikYuzde<P.l[0])out.push(['&#128161;',P.name+' is light-hungry; set the strip LED to manual and raise brightness.']);
+  if(f.thirsty&&sT<-3)out.push(['&#128167;','Soil is drying quickly and '+P.name+' prefers steady moisture — add a watering schedule soon.']);
+  if(tT>3&&d.dhtGecerli&&d.sicaklik>P.t[1]-2)out.push(['&#127777;','Temperature is climbing toward '+P.name+" upper limit — pre-emptive ventilation advised."]);
+  if(!out.length)out.push(['&#9989;','All conditions are within ideal range for '+P.name+'.']);
   var u=q('ins');u.innerHTML='';out.forEach(function(o){var li=document.createElement('li');li.className='ins';
     li.innerHTML='<span>'+o[0]+'</span><span>'+o[1]+'</span>';u.appendChild(li);});}
 function gauge(name,val,mn,mx,lo,hi,unit){
@@ -213,9 +247,10 @@ function gauge(name,val,mn,mx,lo,hi,unit){
   var bl=(lo-mn)/(mx-mn)*100,bw=(hi-lo)/(mx-mn)*100;var ok=v>=lo&&v<=hi;var tag=ok?'OK':(v<lo?'low':'high');
   return '<div style="margin:12px 0"><div style="display:flex;justify-content:space-between;font-size:13px"><span>'+name+'</span><span style="font-weight:700;color:'+(ok?'var(--ac)':'var(--dg)')+'">'+val+unit+' · '+tag+'</span></div><div style="position:relative;height:12px;background:var(--ln);border-radius:6px;margin-top:5px"><div style="position:absolute;left:'+bl+'%;width:'+bw+'%;top:0;bottom:0;background:rgba(67,209,122,.35);border-radius:6px"></div><div style="position:absolute;left:'+p+'%;top:-4px;width:4px;height:20px;background:var(--tx);border-radius:2px;transform:translateX(-2px)"></div></div></div>';
 }
-function renderRanges(d){var h='';
-  if(d.dhtGecerli){h+=gauge('Temperature',d.sicaklik.toFixed(1),0,50,18,28,' °C');h+=gauge('Humidity',Math.round(d.nem),0,100,40,70,'%');}
-  h+=gauge('Soil Moisture',d.toprakYuzde,0,100,40,80,'%');h+=gauge('Light',d.isikYuzde,0,100,30,80,'%');q('ranges').innerHTML=h;}
+function renderRanges(d){var P=aktifBitki();var h='';
+  if(d.dhtGecerli){h+=gauge('Temperature',d.sicaklik.toFixed(1),0,50,P.t[0],P.t[1],' °C');h+=gauge('Humidity',Math.round(d.nem),0,100,P.h[0],P.h[1],'%');}
+  h+=gauge('Soil Moisture',d.toprakYuzde,0,100,P.s[0],P.s[1],'%');h+=gauge('Light',d.isikYuzde,0,100,P.l[0],P.l[1],'%');
+  h+='<div class="note">Ideal ranges for <b>'+P.name+'</b>. '+P.tip+'</div>';q('ranges').innerHTML=h;}
 function ring(name,pct){return '<div style="text-align:center"><div style="width:72px;height:72px;border-radius:50%;background:conic-gradient(var(--ac) '+pct+'%,var(--ln) 0)"><div style="position:relative;top:10px;left:10px;width:52px;height:52px;border-radius:50%;background:var(--card);display:flex;align-items:center;justify-content:center;font-weight:700">'+pct+'%</div></div><div style="font-size:12px;color:var(--mut);margin-top:4px">'+name+'</div></div>';}
 function nextWatering(saat){
   if(!planList.length||!saat||saat.charAt(0)=='-')return '—';
@@ -243,6 +278,7 @@ async function durumCek(){
     q('fan').setAttribute('aria-checked',d.fan?'true':'false');
     var ls=q('led');if(document.activeElement!==ls){ls.value=d.led;q('ledv').textContent=d.led;}
     fanOto=d.fanOto;ledOto=d.ledOto;modGorunum();
+    if(d.bitki)bitki=d.bitki;var bs=q('bitki');if(bs&&bs.value!=bitki)bs.value=bitki;
     q('saat').textContent=d.saat||'--:--:--';
     q('up').textContent='Uptime: '+Math.floor(d.calismaSuresi/1000)+'s';
     q('rssi').textContent='Signal: '+(d.rssi||'--')+' dBm';
@@ -251,7 +287,7 @@ async function durumCek(){
     pushHist(d);drawChart();insights(d);renderRanges(d);renderActivity(d);renderTS(d.tsKanal);
   }catch(e){hataSay++;q('dot').className='dot';q('stt').textContent='No connection';}
 }
-durumCek();planCek();setInterval(durumCek,2000);
+bitkiDoldur();durumCek();planCek();setInterval(durumCek,2000);
 addEventListener('resize',drawChart);
 </script>
 </body>
