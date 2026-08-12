@@ -20,6 +20,8 @@
 #include "config.h"
 #include "control_logic.h"
 #include "actuators.h"
+#include "zaman.h"
+#include "sulama_plani.h"
 #include "web_ui.h"
 #include "secrets.h"
 
@@ -119,11 +121,49 @@ inline void handleDurum() {
   doc["ledOto"]        = s_ledOto;
   doc["dhtGecerli"]    = s_durum.dhtGecerli;
   doc["rssi"]          = WiFi.RSSI();
+  char sbuf[12]; zamanMetni(sbuf, sizeof(sbuf));
+  doc["saat"]          = sbuf;
   doc["calismaSuresi"] = millis();
   String cikti;
   serializeJson(doc, cikti);
   corsBasliklari();
   s_server.send(200, F("application/json"), cikti);
+}
+
+// GET /api/plan -> zamanlı sulama listesi
+inline void handlePlan() {
+  JsonDocument doc;
+  JsonArray arr = doc["zamanlar"].to<JsonArray>();
+  for (int i = 0; i < planAdet(); i++) {
+    SulamaZamani z = planAl(i);
+    JsonObject o = arr.add<JsonObject>();
+    o["saat"] = z.saat;
+    o["dakika"] = z.dakika;
+  }
+  String cikti;
+  serializeJson(doc, cikti);
+  corsBasliklari();
+  s_server.send(200, F("application/json"), cikti);
+}
+
+// POST /api/plan {saat,dakika} -> ekle
+inline void handlePlanEkle() {
+  JsonDocument doc;
+  if (!govdeyiAl(doc)) return;
+  if (!doc["saat"].is<int>() || !doc["dakika"].is<int>()) { jsonHata(400, "saat ve dakika sayi olmali"); return; }
+  int s = doc["saat"], d = doc["dakika"];
+  if (!zamanGecerliMi(s, d)) { jsonHata(400, "saat 0-23, dakika 0-59 olmali"); return; }
+  if (!planEkle(s, d)) { jsonHata(400, "eklenemedi (dolu veya mukerrer)"); return; }
+  jsonOk("Sulama zamani eklendi");
+}
+
+// DELETE /api/plan {index} -> sil
+inline void handlePlanSil() {
+  JsonDocument doc;
+  if (!govdeyiAl(doc)) return;
+  if (!doc["index"].is<int>()) { jsonHata(400, "index sayi olmali"); return; }
+  if (!planSil(doc["index"])) { jsonHata(400, "gecersiz index"); return; }
+  jsonOk("Sulama zamani silindi");
 }
 
 inline void handleSula() {
@@ -199,7 +239,10 @@ inline void sunucuBaslat() {
   s_server.on("/api/fan",     HTTP_POST, handleFan);
   s_server.on("/api/led",     HTTP_POST, handleLed);
   s_server.on("/api/mod",     HTTP_POST, handleMod);
-  s_server.on("/api/saglik",  HTTP_GET,  handleSaglik);
+  s_server.on("/api/saglik",  HTTP_GET,    handleSaglik);
+  s_server.on("/api/plan",    HTTP_GET,    handlePlan);
+  s_server.on("/api/plan",    HTTP_POST,   handlePlanEkle);
+  s_server.on("/api/plan",    HTTP_DELETE, handlePlanSil);
   s_server.onNotFound(handleNotFound);
   s_server.begin();
   s_sunucuBasladi = true;
@@ -225,6 +268,7 @@ inline AgDurumu agGuncelle(unsigned long simdi) {
       if (st == WL_CONNECTED) {
         s_agDurumu = AgDurumu::BAGLI;
         Serial.print(F("WiFi BAGLI, IP: ")); Serial.println(WiFi.localIP());
+        zamanBaslat();       // NTP senkronu başlat (zamanlı sulama için)
         mdnsBaslat();
         sunucuBaslat();
       } else if (simdi - s_baglanmaBaslangic >= WIFI_BAGLANTI_ZAMANASIMI) {
