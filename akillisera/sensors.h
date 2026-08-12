@@ -47,6 +47,9 @@ inline bool dhtArizali() {
   return s_dhtHataSayaci >= DHT_MAX_FAILS;
 }
 
+// Ardışık DHT hata sayısı (health endpoint için).
+inline int dhtHataSayisi() { return s_dhtHataSayaci; }
+
 // Analog okuma medyan filtresi. Ortalama tek sıçramadan etkilenir; medyan etkilenmez
 // (elektriksel gürültü, pompa rölesi çekerken besleme dalgalanması).
 inline int analogOkuMedyan(uint8_t pin, uint8_t ornekSayisi = 5) {

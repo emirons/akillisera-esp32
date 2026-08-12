@@ -136,6 +136,12 @@ inline bool alarmKarari(float sicaklik) {
   return sicaklik > TEMP_HIGH_THRESHOLD;
 }
 
+// 5b. API girdi doğrulama (saf, test edilebilir): parlaklık 0-255 aralığında mı?
+// Web/TalkBack'ten gelen değer sessizce KIRPILMAZ; geçersizse çağıran 400 alır.
+inline bool parlaklikGecerliMi(int deger) {
+  return deger >= 0 && deger <= 255;
+}
+
 // 6. Sensör değeri geçerli mi? NaN/sonsuz değil ve makul aralıkta.
 inline bool sensorDegeriGecerli(float deger) {
   return std::isfinite(deger) && deger >= -40.0f && deger <= 80.0f;
