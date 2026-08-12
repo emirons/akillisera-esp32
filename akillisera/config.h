@@ -37,6 +37,12 @@ constexpr float HUM_HIGH_THRESHOLD  = 70.0f;  // % ÜSTÜnde -> fan aç
 constexpr float HUM_LOW_THRESHOLD   = 60.0f;  // % ALTINDA -> fan kapat (histerezis alt bandı)
 constexpr int   LED_BRIGHTNESS      = 200;    // 0-255, otomatik modda şerit LED parlaklığı
 
+// Kapasitif toprak nem kalibrasyonu — ham değer TERS orantılı (kuru=yüksek, ıslak=düşük).
+// Kişi A kalibrasyonda ölçtükten sonra güncellenecek.
+constexpr int   SOIL_RAW_DRY = 3000;  // havada (kuru) ham okuma -> %0 nem
+constexpr int   SOIL_RAW_WET = 1200;  // suda (ıslak) ham okuma -> %100 nem
+constexpr int   DHT_MAX_FAILS = 5;    // ardışık bu kadar hatada sensör arızalı sayılır
+
 // ============================================================================
 // ZAMANLAMA SABİTLERİ (ms) — hepsi millis() tabanlı, delay() YASAK
 // ============================================================================
