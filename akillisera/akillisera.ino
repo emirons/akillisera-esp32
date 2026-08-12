@@ -8,6 +8,7 @@
 #include "display.h"
 #include "buttons.h"
 #include "agkatmani.h"   // NOT: "network.h" macOS case-insensitive FS'de core'un Network.h ile cakisir
+#include "cloud.h"
 
 void setup() {
   Serial.begin(115200);
@@ -26,6 +27,7 @@ void loop() {
   // Ağ + pompa + butonlar: her turda, gecikmesiz.
   agGuncelle(simdi);
   agIsle();
+  bulutGuncelle(simdi);     // ThingSpeak gönderim + TalkBack (30 sn, WiFi varsa)
   planGuncelle(simdi);      // zamanlı sulama — saat plana denk gelince tetikler
   pompayiGuncelle(simdi);
   if (sayfaButonunaBasildi(simdi))  sayfaDegistir();
@@ -75,7 +77,7 @@ void loop() {
     dk.isikHam = v.isikHam;     dk.isikYuzde = isikYuzde(v.isikHam);
     dk.pompa = pompaCalisiyor(); dk.fan = karar.fanAcik; dk.led = karar.ledParlaklik;
     dk.alarm = karar.alarmAktif; dk.dhtGecerli = v.dhtGecerli; dk.dhtHata = dhtHataSayisi();
-    agDurumGuncelle(dk);
+    kdDurumGuncelle(dk);
   }
 
   ekran.pompaCalisiyor = pompaCalisiyor();
