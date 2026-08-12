@@ -33,3 +33,8 @@ struct DurumKaydi {
 static DurumKaydi g_durum = {};
 inline void kdDurumGuncelle(const DurumKaydi& d) { g_durum = d; }
 inline const DurumKaydi& kdDurum() { return g_durum; }
+
+// loop() süre ölçümü (µs) — /api/saglik'ta maxLoopMikrosaniye olarak raporlanır.
+static unsigned long g_maxLoopUs = 0;
+inline void          kdLoopKaydet(unsigned long us) { if (us > g_maxLoopUs) g_maxLoopUs = us; }
+inline unsigned long kdMaxLoopUs() { return g_maxLoopUs; }
