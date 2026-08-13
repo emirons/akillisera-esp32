@@ -385,38 +385,57 @@ TEST_CASE("alarmKarari: bitki esigiyle") {
 // ---------------------------------------------------------------------------
 // 15. etkinParam — büyüme evresi + mevsim eşik kaydırma
 // ---------------------------------------------------------------------------
-TEST_CASE("etkinParam: vejetatif + ilkbahar = taban") {
-  const BitkiParam& tomato = bitkiParam("tomato");   // tH30 hH70 hL55 sD50 lL60
-  EtkinParam e = etkinParam(tomato, "vejetatif", "ilkbahar");
-  CHECK(e.tempHigh == 30.0f);
-  CHECK(e.soilDryYuzde == 50);
-  CHECK(e.lightLowYuzde == 60);
+TEST_CASE("etkinParam: vejetatif + ilkbahar = taban bantlar") {
+  const BitkiParam& tomato = bitkiParam("tomato");   // t18-27 h50-70 s50-75 l60-90
+  EtkinParam e = etkinParam(tomato, "vejetatif", "ilkbahar", false);
+  CHECK(e.tHi == 27.0f);
+  CHECK(e.sLo == 50);
+  CHECK(e.lLo == 60);
 }
-TEST_CASE("etkinParam: fide daha nemli, az isik, serin") {
+TEST_CASE("etkinParam: fide -> daha nemli toprak, az isik, serin") {
   const BitkiParam& tomato = bitkiParam("tomato");
-  EtkinParam e = etkinParam(tomato, "fide", "ilkbahar");
-  CHECK(e.soilDryYuzde == 60);    // 50+10 daha cok su
-  CHECK(e.lightLowYuzde == 50);   // 60-10 az isik yeter
-  CHECK(e.tempHigh == 28.0f);     // 30-2 serin
+  EtkinParam e = etkinParam(tomato, "fide", "ilkbahar", false);
+  CHECK(e.sLo == 60);    // 50+10 topragi daha nemli tut
+  CHECK(e.lLo == 50);    // 60-10 az isik yeter
+  CHECK(e.tHi == 25.0f); // 27-2 serin
 }
-TEST_CASE("etkinParam: meyve+yaz cok su, erken fan") {
+TEST_CASE("etkinParam: meyve+yaz -> cok su, erken fan") {
   const BitkiParam& tomato = bitkiParam("tomato");
-  EtkinParam e = etkinParam(tomato, "meyve", "yaz");
-  CHECK(e.soilDryYuzde == 68);    // 50+10+8
-  CHECK(e.tempHigh == 29.0f);     // 30+1-2 erken fan
-  CHECK(e.lightLowYuzde == 60);   // 60+10-10
+  EtkinParam e = etkinParam(tomato, "meyve", "yaz", false);
+  CHECK(e.sLo == 68);    // 50+10+8
+  CHECK(e.tHi == 26.0f); // 27+1-2 erken fan
 }
-TEST_CASE("etkinParam: kis az su cok LED") {
-  const BitkiParam& lettuce = bitkiParam("lettuce"); // tH24 hH70 hL55 sD60 lL40
-  EtkinParam e = etkinParam(lettuce, "vejetatif", "kis");
-  CHECK(e.soilDryYuzde == 52);    // 60-8
-  CHECK(e.lightLowYuzde == 55);   // 40+15
-  CHECK(e.tempHigh == 26.0f);     // 24+2
+TEST_CASE("etkinParam: gece serin (t band -2)") {
+  const BitkiParam& tomato = bitkiParam("tomato");
+  EtkinParam gunduz = etkinParam(tomato, "vejetatif", "ilkbahar", false);
+  EtkinParam gece   = etkinParam(tomato, "vejetatif", "ilkbahar", true);
+  CHECK(gece.tHi == gunduz.tHi - 2.0f);
 }
 TEST_CASE("etkinParam: histerezis bandi korunur") {
   const BitkiParam& tomato = bitkiParam("tomato");
-  EtkinParam e = etkinParam(tomato, "fide", "ilkbahar");
-  CHECK(e.humLow < e.humHigh);    // bant ters donmez
+  EtkinParam e = etkinParam(tomato, "fide", "ilkbahar", false);
+  CHECK(e.hLo < e.hHi);    // bant ters donmez
+}
+
+// ---------------------------------------------------------------------------
+// 16. Bant hedefli fan + VPD
+// ---------------------------------------------------------------------------
+TEST_CASE("fanKarariBant: banttan yuksek -> ac, banttan dusuk -> kapat, ic -> koru") {
+  // lettuce band nem[50,70] sic[10,20]
+  CHECK(fanKarariBant(60, 25, false, 50,70,10,20) == true);   // sic>20 ac
+  CHECK(fanKarariBant(75, 15, false, 50,70,10,20) == true);   // nem>70 ac
+  CHECK(fanKarariBant(60, 15, true,  50,70,10,20) == true);   // ikisi de bant ici -> koru(on)
+  CHECK(fanKarariBant(60, 15, false, 50,70,10,20) == false);  // bant ici -> koru(off)
+  CHECK(fanKarariBant(45,  8, true,  50,70,10,20) == false);  // ikisi de dusuk -> kapat
+  CHECK(fanKarariBant(60,  8, true,  50,70,10,20) == true);   // nem bant ici -> koru(on)
+}
+TEST_CASE("vpdKpa: bilinen deger ~1.27 kPa (25C,60%)") {
+  float v = vpdKpa(25.0f, 60.0f);
+  CHECK(v > 1.20f);
+  CHECK(v < 1.35f);
+}
+TEST_CASE("vpdKpa: cok nemli -> dusuk VPD") {
+  CHECK(vpdKpa(22.0f, 95.0f) < 0.2f);
 }
 
 TEST_CASE("sayfaSatirlari: SISTEM wifi yok / var") {

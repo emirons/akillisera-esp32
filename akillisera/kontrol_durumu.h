@@ -29,6 +29,8 @@ struct DurumKaydi {
   int   led;
   bool  alarm, dhtGecerli;
   int   dhtHata;
+  bool  gece;
+  float vpd;
 };
 static DurumKaydi g_durum = {};
 inline void kdDurumGuncelle(const DurumKaydi& d) { g_durum = d; }
