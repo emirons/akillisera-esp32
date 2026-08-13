@@ -25,7 +25,8 @@ void setup() {
 void loop() {
   unsigned long loopBasla = micros();
   unsigned long simdi = millis();
-  const BitkiParam& bp = bitkiParam(bitkiAl());   // seçili bitkinin kontrol eşikleri
+  // Seçili bitki + büyüme evresi + mevsime göre ETKİN kontrol eşikleri.
+  EtkinParam ep = etkinParam(bitkiParam(bitkiAl()), evreAl(), mevsimAl());
 
   // Ağ + bulut + pompa: her turda, gecikmesiz.
   agGuncelle(simdi);
@@ -35,7 +36,7 @@ void loop() {
 
   // SULAMA modu: OTO = bitkinin optimum saatleri; MANUEL = kullanıcı planı.
   // Manuel WATER butonu her koşulda çalışır (elle sulama).
-  if (kdSulamaOto()) bitkiOtoSulamaIsle(bp.otoSulama, bp.otoSulamaAdet, simdi);
+  if (kdSulamaOto()) bitkiOtoSulamaIsle(ep.otoSulama, ep.otoSulamaAdet, simdi);
   else               planGuncelle(simdi);
 
   if (sayfaButonunaBasildi(simdi))  sayfaDegistir();
@@ -53,22 +54,22 @@ void loop() {
     int isikY   = isikYuzde(v.isikHam);
 
     // OTO sulama modunda toprak-eşiği güvenlik sulaması (bitkiye özel %).
-    if (kdSulamaOto() && sulamaGerekliYuzde(toprakY, bp.soilDryYuzde, pompaCalisiyor()))
+    if (kdSulamaOto() && sulamaGerekliYuzde(toprakY, ep.soilDryYuzde, pompaCalisiyor()))
       pompayiTetikle(simdi);
 
     // Fan: bitki histerezis eşikleriyle (oto), yoksa manuel.
     if (agFanOto()) {
-      fanDurum      = fanKarari(v.nem, v.sicaklik, fanDurum, bp.humHigh, bp.humLow, bp.tempHigh);
+      fanDurum      = fanKarari(v.nem, v.sicaklik, fanDurum, ep.humHigh, ep.humLow, ep.tempHigh);
       karar.fanAcik = fanDurum;
     } else {
       karar.fanAcik = agManuelFan();
     }
 
     // LED: bitki ışık eşiği % (oto), yoksa manuel parlaklık.
-    if (agLedOto()) karar.ledParlaklik = (isikY < bp.lightLowYuzde) ? LED_BRIGHTNESS : 0;
+    if (agLedOto()) karar.ledParlaklik = (isikY < ep.lightLowYuzde) ? LED_BRIGHTNESS : 0;
     else            karar.ledParlaklik = ledParlaklikKarari(0, true, agManuelLed());
 
-    karar.alarmAktif = alarmKarari(v.sicaklik, bp.tempHigh);   // bitki sıcaklık eşiği
+    karar.alarmAktif = alarmKarari(v.sicaklik, ep.tempHigh);   // bitki sıcaklık eşiği
 
     // Ekran + API durum snapshot
     ekran.sicaklik    = v.sicaklik;

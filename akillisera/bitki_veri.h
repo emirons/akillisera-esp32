@@ -36,3 +36,39 @@ inline const BitkiParam& bitkiParam(const char* anahtar) {
   }
   return BITKILER[0];
 }
+
+// Büyüme evresi + mevsime göre uyarlanmış ETKİN eşikler. Otonom kontrol ve arayüz
+// önerileri bunu kullanır. Sulama saatleri tabandan gelir; eşikler kaydırılır.
+struct EtkinParam {
+  float tempHigh, humHigh, humLow;
+  int   soilDryYuzde, lightLowYuzde;
+  const SulamaZamani* otoSulama;
+  int   otoSulamaAdet;
+};
+
+inline int   biKirp(int v, int lo, int hi)       { return v < lo ? lo : (v > hi ? hi : v); }
+inline float biKirpF(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+inline EtkinParam etkinParam(const BitkiParam& bp, const char* evre, const char* mevsim) {
+  float tH = bp.tempHigh, hH = bp.humHigh, hL = bp.humLow;
+  int   sD = bp.soilDryYuzde, lL = bp.lightLowYuzde;
+
+  // Büyüme evresi: fide daha nemli + az ışık; meyve daha çok su + ışık, düşük nem.
+  if      (strcmp(evre, "fide")  == 0) { sD += 10; lL -= 10; hH += 5; hL += 5; tH -= 2; }
+  else if (strcmp(evre, "meyve") == 0) { sD += 10; lL += 10; hH -= 5;          tH += 1; }
+
+  // Mevsim: yaz erken fan + çok su + az LED; kış az su + çok LED + sıcaklık toleransı.
+  if      (strcmp(mevsim, "yaz") == 0) { tH -= 2; sD += 8;  lL -= 10; }
+  else if (strcmp(mevsim, "kis") == 0) { tH += 2; sD -= 8;  lL += 15; }
+
+  EtkinParam e;
+  e.tempHigh = biKirpF(tH, 15, 45);
+  e.humHigh  = biKirpF(hH, 40, 95);
+  e.humLow   = biKirpF(hL, 30, 90);
+  if (e.humLow >= e.humHigh) e.humLow = e.humHigh - 5;   // histerezis bandı korunsun
+  e.soilDryYuzde  = biKirp(sD, 10, 90);
+  e.lightLowYuzde = biKirp(lL, 0, 95);
+  e.otoSulama = bp.otoSulama;
+  e.otoSulamaAdet = bp.otoSulamaAdet;
+  return e;
+}

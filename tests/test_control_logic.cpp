@@ -8,6 +8,7 @@
 #include <cmath>
 #include <limits>
 #include "control_logic.h"
+#include "bitki_veri.h"
 
 // ---------------------------------------------------------------------------
 // 1. sulamaGerekli — toprakNem > SOIL_DRY_THRESHOLD (2200) VE pompa kapalı
@@ -379,6 +380,43 @@ TEST_CASE("alarmKarari: bitki esigiyle") {
   CHECK(alarmKarari(25.0f, 24.0f) == true);
   CHECK(alarmKarari(23.0f, 24.0f) == false);
   CHECK(alarmKarari(36.0f) == true);
+}
+
+// ---------------------------------------------------------------------------
+// 15. etkinParam — büyüme evresi + mevsim eşik kaydırma
+// ---------------------------------------------------------------------------
+TEST_CASE("etkinParam: vejetatif + ilkbahar = taban") {
+  const BitkiParam& tomato = bitkiParam("tomato");   // tH30 hH70 hL55 sD50 lL60
+  EtkinParam e = etkinParam(tomato, "vejetatif", "ilkbahar");
+  CHECK(e.tempHigh == 30.0f);
+  CHECK(e.soilDryYuzde == 50);
+  CHECK(e.lightLowYuzde == 60);
+}
+TEST_CASE("etkinParam: fide daha nemli, az isik, serin") {
+  const BitkiParam& tomato = bitkiParam("tomato");
+  EtkinParam e = etkinParam(tomato, "fide", "ilkbahar");
+  CHECK(e.soilDryYuzde == 60);    // 50+10 daha cok su
+  CHECK(e.lightLowYuzde == 50);   // 60-10 az isik yeter
+  CHECK(e.tempHigh == 28.0f);     // 30-2 serin
+}
+TEST_CASE("etkinParam: meyve+yaz cok su, erken fan") {
+  const BitkiParam& tomato = bitkiParam("tomato");
+  EtkinParam e = etkinParam(tomato, "meyve", "yaz");
+  CHECK(e.soilDryYuzde == 68);    // 50+10+8
+  CHECK(e.tempHigh == 29.0f);     // 30+1-2 erken fan
+  CHECK(e.lightLowYuzde == 60);   // 60+10-10
+}
+TEST_CASE("etkinParam: kis az su cok LED") {
+  const BitkiParam& lettuce = bitkiParam("lettuce"); // tH24 hH70 hL55 sD60 lL40
+  EtkinParam e = etkinParam(lettuce, "vejetatif", "kis");
+  CHECK(e.soilDryYuzde == 52);    // 60-8
+  CHECK(e.lightLowYuzde == 55);   // 40+15
+  CHECK(e.tempHigh == 26.0f);     // 24+2
+}
+TEST_CASE("etkinParam: histerezis bandi korunur") {
+  const BitkiParam& tomato = bitkiParam("tomato");
+  EtkinParam e = etkinParam(tomato, "fide", "ilkbahar");
+  CHECK(e.humLow < e.humHigh);    // bant ters donmez
 }
 
 TEST_CASE("sayfaSatirlari: SISTEM wifi yok / var") {
