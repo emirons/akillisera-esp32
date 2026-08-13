@@ -73,10 +73,22 @@ canvas{width:100%;height:180px;display:block}
   </div>
 </div>
 
-<div class="ctrl" style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-  <span class="lbl">Plant / Crop</span>
-  <select id="bitki" aria-label="Select plant" onchange="bitkiSec(this.value)"
-    style="min-height:44px;flex:0 1 240px;background:var(--ln);color:var(--tx);border:1px solid var(--ln);border-radius:10px;padding:0 10px;font:inherit"></select>
+<div class="ctrl" style="margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span class="lbl">Plant</span>
+    <select id="bitki" aria-label="Select plant" onchange="bitkiSec(this.value)"
+      style="min-height:44px;flex:1 1 140px;background:var(--ln);color:var(--tx);border:1px solid var(--ln);border-radius:10px;padding:0 10px;font:inherit"></select>
+    <span class="lbl">Stage</span>
+    <select id="evre" aria-label="Growth stage" onchange="evreSec(this.value)"
+      style="min-height:44px;flex:1 1 130px;background:var(--ln);color:var(--tx);border:1px solid var(--ln);border-radius:10px;padding:0 10px;font:inherit">
+      <option value="fide">Seedling</option><option value="vejetatif">Vegetative</option><option value="meyve">Flowering/Fruiting</option>
+    </select>
+    <span class="lbl">Season</span>
+    <select id="mevsim" aria-label="Season" onchange="mevsimSec(this.value)"
+      style="min-height:44px;flex:1 1 120px;background:var(--ln);color:var(--tx);border:1px solid var(--ln);border-radius:10px;padding:0 10px;font:inherit">
+      <option value="ilkbahar">Spring</option><option value="yaz">Summer</option><option value="sonbahar">Autumn</option><option value="kis">Winter</option>
+    </select>
+  </div>
 </div>
 
 <div class="wrap">
@@ -187,7 +199,21 @@ var PLANTS={
  strawberry:{name:'Strawberry',t:[15,24],h:[50,70],s:[50,75],l:[55,90],f:{light:1},tip:'Moderate temps, steady moisture, good light.'},
  spinach:{name:'Spinach',t:[10,22],h:[50,70],s:[55,80],l:[40,70],f:{cool:1,thirsty:1},tip:'Cool-season; bolts in heat, keep soil moist.'}
 };
+var evre='vejetatif', mevsim='ilkbahar';
 function aktifBitki(){return PLANTS[bitki]||PLANTS.custom;}
+function clampB(v,lo,hi){return v<lo?lo:(v>hi?hi:v);}
+// Etkin ideal aralıklar: bitki tabanı + büyüme evresi + mevsim (backend etkinParam ile aynı mantık).
+function etkinBitki(){
+  var P=aktifBitki();var dT=0,dH=0,dS=0,dL=0;
+  if(evre=='fide'){dS+=10;dL-=10;dH+=5;dT-=2;} else if(evre=='meyve'){dS+=10;dL+=10;dH-=5;dT+=1;}
+  if(mevsim=='yaz'){dT-=2;dS+=8;dL-=10;} else if(mevsim=='kis'){dT+=2;dS-=8;dL+=15;}
+  function sh(b,o,lo,hi){return [clampB(b[0]+o,lo,hi),clampB(b[1]+o,lo,hi)];}
+  return {name:P.name,tip:P.tip,f:P.f,t:sh(P.t,dT,0,50),h:sh(P.h,dH,0,100),s:sh(P.s,dS,0,100),l:sh(P.l,dL,0,100)};
+}
+function evreAdi(){return {fide:'Seedling',vejetatif:'Vegetative',meyve:'Flowering/Fruiting'}[evre]||evre;}
+function mevsimAdi(){return {ilkbahar:'Spring',yaz:'Summer',sonbahar:'Autumn',kis:'Winter'}[mevsim]||mevsim;}
+async function evreSec(v){evre=v;try{await fetch('/api/bitki',{method:'POST',body:JSON.stringify({evre:v})});}catch(e){}durumCek();}
+async function mevsimSec(v){mevsim=v;try{await fetch('/api/bitki',{method:'POST',body:JSON.stringify({mevsim:v})});}catch(e){}durumCek();}
 function trend(a){var v=a.filter(function(x){return x!=null;});if(v.length<4)return 0;return v[v.length-1]-v[Math.max(0,v.length-10)];}
 async function bitkiSec(k){bitki=k;try{await fetch('/api/bitki',{method:'POST',body:JSON.stringify({bitki:k})});}catch(e){}durumCek();}
 function bitkiDoldur(){var s=q('bitki');if(s.options.length)return;var h='';for(var k in PLANTS)h+='<option value="'+k+'">'+PLANTS[k].name+'</option>';s.innerHTML=h;}
@@ -249,7 +275,7 @@ function drawChart(){var cv=q('chart');if(!cv)return;var W=cv.clientWidth||600,H
   line(c,hist.t,'#ff7a45',0,50,W,H);line(c,hist.h,'#43a3ff',0,100,W,H);line(c,hist.s,'#43d17a',0,100,W,H);}
 // Öneri motoru: Condition Ranges (bitki ideal aralığı) + History trend + bitki
 // bilgi tabanı bayraklarının BİRLEŞİMİnden özgün, kombinasyona özel tavsiyeler.
-function insights(d){var P=aktifBitki(),f=P.f||{},out=[];
+function insights(d){var P=etkinBitki(),f=P.f||{},out=[];
   if(d.alarm)out.push(['&#9888;','High-temperature alarm — ventilation active. Check greenhouse cooling.']);
   if(!d.dhtGecerli)out.push(['&#9888;','Temperature/humidity sensor fault — readings unavailable.']);
   // Bitkiye özel aralık kontrolleri
@@ -273,10 +299,10 @@ function gauge(name,val,mn,mx,lo,hi,unit){
   var bl=(lo-mn)/(mx-mn)*100,bw=(hi-lo)/(mx-mn)*100;var ok=v>=lo&&v<=hi;var tag=ok?'OK':(v<lo?'low':'high');
   return '<div style="margin:12px 0"><div style="display:flex;justify-content:space-between;font-size:13px"><span>'+name+'</span><span style="font-weight:700;color:'+(ok?'var(--ac)':'var(--dg)')+'">'+val+unit+' · '+tag+'</span></div><div style="position:relative;height:12px;background:var(--ln);border-radius:6px;margin-top:5px"><div style="position:absolute;left:'+bl+'%;width:'+bw+'%;top:0;bottom:0;background:rgba(67,209,122,.35);border-radius:6px"></div><div style="position:absolute;left:'+p+'%;top:-4px;width:4px;height:20px;background:var(--tx);border-radius:2px;transform:translateX(-2px)"></div></div></div>';
 }
-function renderRanges(d){var P=aktifBitki();var h='';
+function renderRanges(d){var P=etkinBitki();var h='';
   if(d.dhtGecerli){h+=gauge('Temperature',d.sicaklik.toFixed(1),0,50,P.t[0],P.t[1],' °C');h+=gauge('Humidity',Math.round(d.nem),0,100,P.h[0],P.h[1],'%');}
   h+=gauge('Soil Moisture',d.toprakYuzde,0,100,P.s[0],P.s[1],'%');h+=gauge('Light',d.isikYuzde,0,100,P.l[0],P.l[1],'%');
-  h+='<div class="note">Ideal ranges for <b>'+P.name+'</b>. '+P.tip+'</div>';q('ranges').innerHTML=h;}
+  h+='<div class="note">Ideal ranges for <b>'+P.name+'</b> · '+evreAdi()+' · '+mevsimAdi()+'. '+P.tip+'</div>';q('ranges').innerHTML=h;}
 function ring(name,pct){return '<div style="text-align:center"><div style="width:72px;height:72px;border-radius:50%;background:conic-gradient(var(--ac) '+pct+'%,var(--ln) 0)"><div style="position:relative;top:10px;left:10px;width:52px;height:52px;border-radius:50%;background:var(--card);display:flex;align-items:center;justify-content:center;font-weight:700">'+pct+'%</div></div><div style="font-size:12px;color:var(--mut);margin-top:4px">'+name+'</div></div>';}
 function nextWatering(saat){
   if(!planList.length||!saat||saat.charAt(0)=='-')return '—';
@@ -305,6 +331,8 @@ async function durumCek(){
     var ls=q('led');if(document.activeElement!==ls){ls.value=d.led;q('ledv').textContent=d.led;}
     fanOto=d.fanOto;ledOto=d.ledOto;modGorunum();
     if(d.bitki)bitki=d.bitki;var bs=q('bitki');if(bs&&bs.value!=bitki)bs.value=bitki;
+    if(d.evre)evre=d.evre;var es=q('evre');if(es&&es.value!=evre)es.value=evre;
+    if(d.mevsim)mevsim=d.mevsim;var ms=q('mevsim');if(ms&&ms.value!=mevsim)ms.value=mevsim;
     renderSulama(d);
     q('saat').textContent=d.saat||'--:--:--';
     q('up').textContent='Uptime: '+Math.floor(d.calismaSuresi/1000)+'s';

@@ -119,6 +119,8 @@ inline void handleDurum() {
   doc["rssi"]          = WiFi.RSSI();
   doc["tsKanal"]       = TS_CHANNEL_ID;   // public channel ID (write key gizli kalır)
   doc["bitki"]         = bitkiAl();
+  doc["evre"]          = evreAl();
+  doc["mevsim"]        = mevsimAl();
   char sbuf[12]; zamanMetni(sbuf, sizeof(sbuf));
   doc["saat"]          = sbuf;
   doc["calismaSuresi"] = millis();
@@ -156,18 +158,25 @@ inline void handlePlanEkle() {
 }
 
 // GET /api/bitki -> seçili bitki; POST /api/bitki {bitki:"anahtar"} -> ayarla
+// Kısa metin anahtarını güvenli doğrula (boş değil, < sınır).
+inline bool anahtarGecerli(const char* k) { size_t n = strlen(k); return n > 0 && n < 16; }
+
+// GET -> bitki/evre/mevsim; POST {bitki?,evre?,mevsim?} -> verilenleri ayarla.
 inline void handleBitki() {
   if (s_server.method() == HTTP_POST) {
     JsonDocument doc;
     if (!govdeyiAl(doc)) return;
-    if (!doc["bitki"].is<const char*>()) { jsonHata(400, "bitki metin olmali"); return; }
-    const char* k = doc["bitki"];
-    if (strlen(k) == 0 || strlen(k) >= 20) { jsonHata(400, "gecersiz bitki anahtari"); return; }
-    bitkiAyarla(k);
-    jsonOk("Bitki ayarlandi");
+    bool degisti = false;
+    if (doc["bitki"].is<const char*>())  { const char* v = doc["bitki"];  if (!anahtarGecerli(v)) { jsonHata(400,"gecersiz bitki"); return; } bitkiAyarla(v);  degisti = true; }
+    if (doc["evre"].is<const char*>())   { const char* v = doc["evre"];   if (!anahtarGecerli(v)) { jsonHata(400,"gecersiz evre"); return; }  evreAyarla(v);   degisti = true; }
+    if (doc["mevsim"].is<const char*>()) { const char* v = doc["mevsim"]; if (!anahtarGecerli(v)) { jsonHata(400,"gecersiz mevsim"); return; } mevsimAyarla(v); degisti = true; }
+    if (!degisti) { jsonHata(400, "bitki, evre veya mevsim gerekli"); return; }
+    jsonOk("Ayarlandi");
   } else {
     JsonDocument doc;
-    doc["bitki"] = bitkiAl();
+    doc["bitki"]  = bitkiAl();
+    doc["evre"]   = evreAl();
+    doc["mevsim"] = mevsimAl();
     String cikti; serializeJson(doc, cikti);
     corsBasliklari();
     s_server.send(200, F("application/json"), cikti);
