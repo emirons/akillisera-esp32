@@ -25,6 +25,47 @@ Wi-Fi kopsa bile sera **otonom** çalışmaya devam eder: sulama, fan, LED, alar
 
 Kart: **NodeMCU-32S** (ESP32-WROOM-32). FQBN: `esp32:esp32:nodemcu-32s`.
 
+### Detaylı Bağlantı (Wiring) Tablosu
+
+Her bileşenin her ucunun ESP32 (veya güç/GND) ile eşleşmesi. Ortak GND şarttır: tüm modüllerin GND'si ve harici 12 V beslemenin GND'si ESP32 GND'siyle birleştirilir.
+
+| Bileşen | Bileşen Ucu | Bağlanır | Not |
+|:---|:---|:---|:---|
+| **DHT11** (3-pin modül) | VCC (+) | ESP32 **3V3** | — |
+| | DATA (OUT) | ESP32 **GPIO4** | Modülde dahili pull-up var; çıplak sensörde DATA–VCC arası 10 kΩ |
+| | GND (−) | ESP32 **GND** | — |
+| **Kapasitif Toprak Nem** | VCC | ESP32 **3V3** | — |
+| | GND | ESP32 **GND** | — |
+| | AOUT (analog) | ESP32 **GPIO34** | ADC1 — Wi-Fi ile uyumlu |
+| **LDR Modülü** | VCC | ESP32 **3V3** | Çıplak LDR: bir uç 3V3, diğer uç GPIO35 **+** 10 kΩ→GND (gerilim bölücü) |
+| | GND | ESP32 **GND** | — |
+| | AO (analog) | ESP32 **GPIO35** | ADC1 |
+| **16x2 LCD** (I2C/PCF8574) | VCC | **5V** (bazı modüller 3V3) | I2C hattı 3.3 V mantıkla uyumlu |
+| | GND | ESP32 **GND** | — |
+| | SDA | ESP32 **GPIO21** | — |
+| | SCL | ESP32 **GPIO22** | Adres `0x27` (bazı modüller `0x3F`) |
+| **2-Kanal Röle Modülü** | VCC | **5V** | — |
+| | GND | ESP32 **GND** | — |
+| | IN1 (su pompası) | ESP32 **GPIO5** | **Aktif-LOW** (LOW = röle çeker) |
+| | IN2 (tahliye fanı) | ESP32 **GPIO18** | **Aktif-LOW** |
+| | COM / NO | Pompa/Fan güç hattı | Röle kontağı yükü anahtarlar |
+| **Şerit LED** (MOSFET ile) | MOSFET Gate | ESP32 **GPIO25** | 220 Ω seri; Gate–GND arası 10 kΩ pull-down önerilir |
+| | MOSFET Drain | Şerit LED (−) | — |
+| | MOSFET Source | ESP32 **GND** | — |
+| | Şerit LED (+) | **+12V** (harici) | 12V GND ↔ ESP32 GND ortak |
+| **Buzzer** (aktif) | + | ESP32 **GPIO19** | — |
+| | − | ESP32 **GND** | — |
+| **Yeşil LED** (durum) | Anot (+) | ESP32 **GPIO2** | 220 Ω seri direnç |
+| | Katot (−) | ESP32 **GND** | — |
+| **Kırmızı LED** (alarm) | Anot (+) | ESP32 **GPIO15** | 220 Ω seri direnç |
+| | Katot (−) | ESP32 **GND** | — |
+| **Buton 1** (sulama) | 1. bacak | ESP32 **GPIO12** | INPUT_PULLUP — harici direnç gerekmez |
+| | 2. bacak | ESP32 **GND** | Basılınca pin LOW okur |
+| **Buton 2** (sayfa) | 1. bacak | ESP32 **GPIO14** | INPUT_PULLUP |
+| | 2. bacak | ESP32 **GND** | — |
+
+**Güç hatları:** DHT11 / toprak nem / LDR → **3V3**. LCD / röle modülü → **5V**. Şerit LED → **harici 12V** (MOSFET ile anahtarlanır). **Yalnızca ADC1 pinleri** (GPIO32–39) Wi-Fi açıkken analog okunur — bu yüzden toprak nem GPIO34, LDR GPIO35.
+
 ---
 
 ## Mimari
