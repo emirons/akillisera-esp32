@@ -199,7 +199,7 @@ var PLANTS={
  strawberry:{name:'Strawberry',t:[15,24],h:[50,70],s:[50,75],l:[55,90],f:{light:1},tip:'Moderate temps, steady moisture, good light.'},
  spinach:{name:'Spinach',t:[10,22],h:[50,70],s:[55,80],l:[40,70],f:{cool:1,thirsty:1},tip:'Cool-season; bolts in heat, keep soil moist.'}
 };
-var evre='vejetatif', mevsim='ilkbahar';
+var evre='vejetatif', mevsim='ilkbahar', gecemi=false;
 function aktifBitki(){return PLANTS[bitki]||PLANTS.custom;}
 function clampB(v,lo,hi){return v<lo?lo:(v>hi?hi:v);}
 // Etkin ideal aralıklar: bitki tabanı + büyüme evresi + mevsim (backend etkinParam ile aynı mantık).
@@ -207,6 +207,7 @@ function etkinBitki(){
   var P=aktifBitki();var dT=0,dH=0,dS=0,dL=0;
   if(evre=='fide'){dS+=10;dL-=10;dH+=5;dT-=2;} else if(evre=='meyve'){dS+=10;dL+=10;dH-=5;dT+=1;}
   if(mevsim=='yaz'){dT-=2;dS+=8;dL-=10;} else if(mevsim=='kis'){dT+=2;dS-=8;dL+=15;}
+  if(gecemi)dT-=2;   // gece serin (kontrol ile ayni)
   function sh(b,o,lo,hi){return [clampB(b[0]+o,lo,hi),clampB(b[1]+o,lo,hi)];}
   return {name:P.name,tip:P.tip,f:P.f,t:sh(P.t,dT,0,50),h:sh(P.h,dH,0,100),s:sh(P.s,dS,0,100),l:sh(P.l,dL,0,100)};
 }
@@ -291,7 +292,12 @@ function insights(d){var P=etkinBitki(),f=P.f||{},out=[];
   if(f.light&&d.isikYuzde<P.l[0])out.push(['&#128161;',P.name+' is light-hungry; set the strip LED to manual and raise brightness.']);
   if(f.thirsty&&sT<-3)out.push(['&#128167;','Soil is drying quickly and '+P.name+' prefers steady moisture — add a watering schedule soon.']);
   if(tT>3&&d.dhtGecerli&&d.sicaklik>P.t[1]-2)out.push(['&#127777;','Temperature is climbing toward '+P.name+" upper limit — pre-emptive ventilation advised."]);
-  if(!out.length)out.push(['&#9989;','All conditions are within ideal range for '+P.name+'.']);
+  // VPD (hava stresi) + gündüz/gece
+  if(d.dhtGecerli){var vp=d.vpd||0;
+    if(vp>1.6)out.push(['&#9888;','VPD '+vp.toFixed(2)+' kPa — air too dry (transpiration stress). No humidifier in hardware: mist manually or reduce ventilation.']);
+    else if(vp>0&&vp<0.5)out.push(['&#128167;','VPD '+vp.toFixed(2)+' kPa — air too humid (fungal risk). Increase ventilation.']);}
+  if(d.gece)out.push(['&#127769;','Night mode: grow light off and cooler target — plants resting.']);
+  if(!out.length)out.push(['&#9989;','All conditions are within ideal range for '+P.name+' (auto mode holding the band).']);
   var u=q('ins');u.innerHTML='';out.forEach(function(o){var li=document.createElement('li');li.className='ins';
     li.innerHTML='<span>'+o[0]+'</span><span>'+o[1]+'</span>';u.appendChild(li);});}
 function gauge(name,val,mn,mx,lo,hi,unit){
@@ -316,7 +322,11 @@ function renderTS(k){var t=q('ts');
   t.innerHTML=f.map(function(x){return '<iframe title="'+x[1]+'" loading="lazy" style="border:1px solid var(--ln);border-radius:8px;width:100%;height:160px" src="https://thingspeak.com/channels/'+k+'/charts/'+x[0]+'?bgcolor=%23ffffff&color=%23'+x[2]+'&dynamic=true&days=1&results=60&type=line&title='+encodeURIComponent(x[1])+'&xaxis=Time&yaxis="></iframe>';}).join('');}
 function renderActivity(d){var n=acc.n||1;
   var html=ring('Fan',Math.round(acc.fan/n*100))+ring('LED',Math.round(acc.led/n*100))+ring('Pump',Math.round(acc.pump/n*100));
-  html+='<div style="flex:1;min-width:150px"><div style="font-size:13px;color:var(--mut)">Next watering</div><div style="font-size:19px;font-weight:700;color:var(--ac)">'+nextWatering(d.saat)+'</div></div>';
+  var vpd=(d.vpd||0).toFixed(2);
+  html+='<div style="flex:1;min-width:150px">'
+    +'<div style="font-size:13px;color:var(--mut)">Next watering</div><div style="font-size:19px;font-weight:700;color:var(--ac)">'+nextWatering(d.saat)+'</div>'
+    +'<div style="font-size:13px;color:var(--mut);margin-top:8px">VPD · Mode</div>'
+    +'<div style="font-size:16px;font-weight:700">'+vpd+' kPa · '+(d.gece?'&#127769; Night':'&#9728; Day')+'</div></div>';
   q('act').innerHTML=html;}
 async function durumCek(){
   try{
@@ -333,6 +343,7 @@ async function durumCek(){
     if(d.bitki)bitki=d.bitki;var bs=q('bitki');if(bs&&bs.value!=bitki)bs.value=bitki;
     if(d.evre)evre=d.evre;var es=q('evre');if(es&&es.value!=evre)es.value=evre;
     if(d.mevsim)mevsim=d.mevsim;var ms=q('mevsim');if(ms&&ms.value!=mevsim)ms.value=mevsim;
+    gecemi=!!d.gece;
     renderSulama(d);
     q('saat').textContent=d.saat||'--:--:--';
     q('up').textContent='Uptime: '+Math.floor(d.calismaSuresi/1000)+'s';

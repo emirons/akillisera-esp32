@@ -116,6 +116,8 @@ inline void handleDurum() {
     o["dakika"] = bp.otoSulama[i].dakika;
   }
   doc["dhtGecerli"]    = d.dhtGecerli;
+  doc["gece"]          = d.gece;
+  doc["vpd"]           = d.vpd;
   doc["rssi"]          = WiFi.RSSI();
   doc["tsKanal"]       = TS_CHANNEL_ID;   // public channel ID (write key gizli kalır)
   doc["bitki"]         = bitkiAl();

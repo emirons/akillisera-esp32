@@ -146,6 +146,26 @@ inline bool alarmKarari(float sicaklik, float tempHigh = TEMP_HIGH_THRESHOLD) {
   return sicaklik > tempHigh;
 }
 
+// 3b. BANT hedefli fan kararı: metrikleri ideal bandın İÇİNDE tutar.
+// Fan yalnızca DÜŞÜRÜR (havalandırma) — sıcaklık VEYA nem bandın ÜSTÜne çıkınca açılır,
+// İKİSİ de bandın ALTına inince kapanır (histerezis = bandın kendisi; röle çatırdamaz).
+// Donanımda ısıtıcı/nemlendirici yok: bandın altındaki düşük sıcaklık/nem düzeltilemez.
+inline bool fanKarariBant(float nem, float sicaklik, bool oncekiDurum,
+                          float humLo, float humHi, float tempLo, float tempHi) {
+  if (sicaklik > tempHi || nem > humHi) return true;    // banttan yüksek -> havalandır
+  if (sicaklik < tempLo && nem < humLo) return false;   // ikisi de banttan düşük -> kapat
+  return oncekiDurum;                                    // bant içinde -> koru
+}
+
+// 5e. VPD (Vapor Pressure Deficit, kPa) — sıcaklık+nem birleşik bitki stresi metriği.
+// Yüksek VPD = hava çok kuru (terleme stresi), düşük VPD = çok nemli (mantar riski).
+// SVP = 0.6108 * exp(17.27*T/(T+237.3)); VPD = SVP * (1 - RH/100).
+inline float vpdKpa(float sicaklik, float nem) {
+  float svp = 0.6108f * std::exp(17.27f * sicaklik / (sicaklik + 237.3f));
+  float v = svp * (1.0f - nem / 100.0f);
+  return v < 0.0f ? 0.0f : v;
+}
+
 // 5b. API girdi doğrulama (saf, test edilebilir): parlaklık 0-255 aralığında mı?
 // Web/TalkBack'ten gelen değer sessizce KIRPILMAZ; geçersizse çağıran 400 alır.
 inline bool parlaklikGecerliMi(int deger) {

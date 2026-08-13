@@ -25,8 +25,11 @@ void setup() {
 void loop() {
   unsigned long loopBasla = micros();
   unsigned long simdi = millis();
-  // Seçili bitki + büyüme evresi + mevsime göre ETKİN kontrol eşikleri.
-  EtkinParam ep = etkinParam(bitkiParam(bitkiAl()), evreAl(), mevsimAl());
+  // Gündüz/gece (NTP): 20:00-06:00 gece. Saat senkron değilse gündüz varsay.
+  int gS, gD, gSn; bool gece = false;
+  if (suankiZaman(gS, gD, gSn)) gece = (gS < 6 || gS >= 20);
+  // Seçili bitki + büyüme evresi + mevsim + gündüz/gece -> ETKİN ideal bantlar.
+  EtkinParam ep = etkinParam(bitkiParam(bitkiAl()), evreAl(), mevsimAl(), gece);
 
   // Ağ + bulut + pompa: her turda, gecikmesiz.
   agGuncelle(simdi);
@@ -53,23 +56,23 @@ void loop() {
     int toprakY = toprakNemYuzde(v.toprakHam);
     int isikY   = isikYuzde(v.isikHam);
 
-    // OTO sulama modunda toprak-eşiği güvenlik sulaması (bitkiye özel %).
-    if (kdSulamaOto() && sulamaGerekliYuzde(toprakY, ep.soilDryYuzde, pompaCalisiyor()))
+    // OTO sulama: toprak ideal bandın ALTINA inince banda çek (bitkiye özel %).
+    if (kdSulamaOto() && sulamaGerekliYuzde(toprakY, ep.sLo, pompaCalisiyor()))
       pompayiTetikle(simdi);
 
-    // Fan: bitki histerezis eşikleriyle (oto), yoksa manuel.
+    // Fan: BANT hedefli — sıcaklık/nem bandın üstüne çıkınca havalandır, banda döndür.
     if (agFanOto()) {
-      fanDurum      = fanKarari(v.nem, v.sicaklik, fanDurum, ep.humHigh, ep.humLow, ep.tempHigh);
+      fanDurum      = fanKarariBant(v.nem, v.sicaklik, fanDurum, ep.hLo, ep.hHi, ep.tLo, ep.tHi);
       karar.fanAcik = fanDurum;
     } else {
       karar.fanAcik = agManuelFan();
     }
 
-    // LED: bitki ışık eşiği % (oto), yoksa manuel parlaklık.
-    if (agLedOto()) karar.ledParlaklik = (isikY < ep.lightLowYuzde) ? LED_BRIGHTNESS : 0;
+    // LED: gece söndür (fotoperiyot/dinlenme); gündüz ışık bandın altındaysa yak.
+    if (agLedOto()) karar.ledParlaklik = (!gece && isikY < ep.lLo) ? LED_BRIGHTNESS : 0;
     else            karar.ledParlaklik = ledParlaklikKarari(0, true, agManuelLed());
 
-    karar.alarmAktif = alarmKarari(v.sicaklik, ep.tempHigh);   // bitki sıcaklık eşiği
+    karar.alarmAktif = alarmKarari(v.sicaklik, ep.alarmHigh);   // bant+4C = tehlike
 
     // Ekran + API durum snapshot
     ekran.sicaklik    = v.sicaklik;
@@ -87,6 +90,7 @@ void loop() {
     dk.isikHam = v.isikHam;     dk.isikYuzde = isikY;
     dk.pompa = pompaCalisiyor(); dk.fan = karar.fanAcik; dk.led = karar.ledParlaklik;
     dk.alarm = karar.alarmAktif; dk.dhtGecerli = v.dhtGecerli; dk.dhtHata = dhtHataSayisi();
+    dk.gece = gece; dk.vpd = v.dhtGecerli ? vpdKpa(v.sicaklik, v.nem) : 0.0f;
     kdDurumGuncelle(dk);
   }
 
