@@ -10,6 +10,8 @@
 struct PompaDurumu { bool acik; unsigned long baslangic; };
 static PompaDurumu    s_pompa = {false, 0};
 static unsigned long  s_pompaSonBitis = 0;      // son sulamanın bitiş anı (soğuma için)
+static uint32_t       s_pompaSure = WATERING_DURATION;  // seçili bitkinin sulama süresi
+static uint32_t       s_pompaAktifSure = WATERING_DURATION; // o an çalışan sulamanın süresi
 static bool           s_sonFanDurumu = false;
 static int            s_sonLedDuty = -1;         // -1: henüz yazılmadı, ilk yazımı zorla
 static unsigned long  s_alarmSonDegisim = 0;
@@ -38,6 +40,11 @@ inline void eyleyicileriBaslat() {
 // 2) POMPA — bloklamayan durum makinesi
 inline bool pompaCalisiyor() { return s_pompa.acik; }
 
+// Aktif sulama süresini ayarla (loop her turda bitkinin etkin süresini yazar).
+// Çalışan sulamayı etkilemez — süre tetiklendiği anda kilitlenir.
+inline void pompaSuresiAyarla(uint32_t ms) { s_pompaSure = ms; }
+inline uint32_t pompaSuresi() { return s_pompaSure; }
+
 // Sulama tetikle. Güvenlik kilidi (60 sn soğuma) control_logic'te; burada uygulanır.
 // Zaten açıksa süreyi UZATMAZ (üst üste basılan buton yeni 5 sn başlatmaz — bilinçli).
 inline void pompayiTetikle(unsigned long simdi) {
@@ -49,11 +56,12 @@ inline void pompayiTetikle(unsigned long simdi) {
   digitalWrite(PUMP_RELAY_PIN, RELAY_ON);
   s_pompa.acik = true;
   s_pompa.baslangic = simdi;
+  s_pompaAktifSure = s_pompaSure;   // süreyi tetikleme anında kilitle
 }
 
 // Her loop turunda çağrılır: süre dolduysa pompayı kapatır (gecikmesiz).
 inline void pompayiGuncelle(unsigned long simdi) {
-  if (s_pompa.acik && pompaSuresiDoldu((uint32_t)simdi, (uint32_t)s_pompa.baslangic)) {
+  if (s_pompa.acik && pompaSuresiDoldu((uint32_t)simdi, (uint32_t)s_pompa.baslangic, s_pompaAktifSure)) {
     digitalWrite(PUMP_RELAY_PIN, RELAY_OFF);
     s_pompa.acik = false;
     s_pompaSonBitis = simdi;
@@ -64,8 +72,8 @@ inline void pompayiGuncelle(unsigned long simdi) {
 inline int pompaKalanSaniye(unsigned long simdi) {
   if (!s_pompa.acik) return 0;
   uint32_t gecen = (uint32_t)simdi - (uint32_t)s_pompa.baslangic;
-  if (gecen >= WATERING_DURATION) return 0;
-  return (int)((WATERING_DURATION - gecen + 999) / 1000);
+  if (gecen >= s_pompaAktifSure) return 0;
+  return (int)((s_pompaAktifSure - gecen + 999) / 1000);
 }
 
 // 3) FAN — yalnızca durum değişince pin yaz (gereksiz röle işlemi yok)

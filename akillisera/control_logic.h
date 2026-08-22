@@ -79,8 +79,26 @@ inline bool sulamaGerekli(int toprakNem, bool pompaAcik) {
 }
 
 // 2. Pompa süresi doldu mu? uint32_t çıkarma millis() taşmasını doğal tolere eder.
-inline bool pompaSuresiDoldu(uint32_t simdi, uint32_t baslangic) {
-  return (uint32_t)(simdi - baslangic) >= WATERING_DURATION;
+// sureMs bitkiye/evreye/mevsime göre değişir (varsayılan config sabiti).
+inline bool pompaSuresiDoldu(uint32_t simdi, uint32_t baslangic,
+                             uint32_t sureMs = WATERING_DURATION) {
+  return (uint32_t)(simdi - baslangic) >= sureMs;
+}
+
+// 2d. Sulama süresi ölçekleme: bitkinin taban süresi büyüme evresi ve mevsime göre
+// ayarlanır. Fide az ve nazik su ister; meyve dönemi ve yaz daha fazla su çeker.
+// Sonuç MIN/MAX arasına kırpılır (pompa güvenliği).
+inline uint32_t sulamaSuresiOlcekle(uint32_t tabanMs, bool fide, bool meyve,
+                                    bool yaz, bool kis) {
+  float k = 1.0f;
+  if (fide)  k *= 0.6f;
+  if (meyve) k *= 1.3f;
+  if (yaz)   k *= 1.25f;
+  if (kis)   k *= 0.7f;
+  uint32_t ms = (uint32_t)(tabanMs * k);
+  if (ms < WATERING_MIN_MS) ms = WATERING_MIN_MS;
+  if (ms > WATERING_MAX_MS) ms = WATERING_MAX_MS;
+  return ms;
 }
 
 // 2b. Sulama güvenlik kilidi: pompa açık değilse VE son sulamadan bu yana

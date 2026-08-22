@@ -31,6 +31,8 @@ void loop() {
   // Seçili bitki + büyüme evresi + mevsim + gündüz/gece -> ETKİN ideal bantlar.
   EtkinParam ep = etkinParam(bitkiParam(bitkiAl()), evreAl(), mevsimAl(), gece);
 
+  pompaSuresiAyarla(ep.sulamaMs);   // sulama MİKTARI bitki+evre+mevsime göre
+
   // Ağ + bulut + pompa: her turda, gecikmesiz.
   agGuncelle(simdi);
   agIsle();

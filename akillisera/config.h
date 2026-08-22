@@ -48,6 +48,8 @@ constexpr int   DHT_MAX_FAILS = 5;    // ardışık bu kadar hatada sensör arı
 // ============================================================================
 constexpr unsigned long WATERING_DURATION    = 5000UL;   // pompa açık kalma süresi
 constexpr unsigned long WATERING_COOLDOWN     = 60000UL;  // ardışık sulamalar arası min (güvenlik kilidi)
+constexpr unsigned long WATERING_MIN_MS       = 2000UL;   // bitki/evre ölçeklemesi sonrası alt sınır
+constexpr unsigned long WATERING_MAX_MS       = 15000UL;  // üst sınır — pompa güvenliği
 constexpr unsigned long SENSOR_READ_INTERVAL  = 2000UL;   // DHT11 en fazla 0.5 Hz
 constexpr unsigned long LCD_REFRESH_INTERVAL  = 500UL;
 constexpr unsigned long CLOUD_INTERVAL        = 30000UL;  // ThingSpeak — API bütçesi, DÜŞÜRME

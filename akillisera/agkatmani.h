@@ -115,8 +115,10 @@ inline void handleDurum() {
   doc["fanOto"]        = kdFanOto();
   doc["ledOto"]        = kdLedOto();
   doc["sulamaOto"]     = kdSulamaOto();
-  // AUTO sulama modunda o bitkinin optimum saatleri (UI'de göstermek için)
+  // AUTO sulama modunda o bitkinin optimum saatleri + miktarı (UI'de göstermek için)
   const BitkiParam& bp = bitkiParam(bitkiAl());
+  EtkinParam ep = etkinParam(bp, evreAl(), mevsimAl(), false);  // süre gece'den bağımsız
+  doc["sulamaSn"] = (int)((ep.sulamaMs + 999) / 1000);
   JsonArray os = doc["otoSulama"].to<JsonArray>();
   for (int i = 0; i < bp.otoSulamaAdet; i++) {
     JsonObject o = os.add<JsonObject>();
