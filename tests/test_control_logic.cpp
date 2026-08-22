@@ -405,6 +405,43 @@ TEST_CASE("etkinParam: meyve+yaz -> cok su, erken fan") {
   CHECK(e.sLo == 68);    // 50+10+8
   CHECK(e.tHi == 26.0f); // 27+1-2 erken fan
 }
+TEST_CASE("sulamaSuresiOlcekle: evre ve mevsim miktari degistirir") {
+  CHECK(sulamaSuresiOlcekle(8000, false,false, false,false) == 8000);   // taban
+  CHECK(sulamaSuresiOlcekle(8000, true, false, false,false) == 4800);   // fide x0.6
+  CHECK(sulamaSuresiOlcekle(8000, false,true,  false,false) == 10400);  // meyve x1.3
+  CHECK(sulamaSuresiOlcekle(8000, false,false, true, false) == 10000);  // yaz x1.25
+  CHECK(sulamaSuresiOlcekle(8000, false,false, false,true)  == 5600);   // kis x0.7
+}
+TEST_CASE("sulamaSuresiOlcekle: sinirlara kirpilir") {
+  CHECK(sulamaSuresiOlcekle(1000, true, false, false,true) == WATERING_MIN_MS);  // cok kucuk
+  CHECK(sulamaSuresiOlcekle(14000, false,true, true, false) == WATERING_MAX_MS); // cok buyuk
+}
+TEST_CASE("bitkiler: sulama sikligi ve miktari GERCEKTEN farkli") {
+  // her bitkinin (adet, sure) ikilisi benzersiz olmali - hepsi 08:00/5sn olmamali
+  int n = BITKI_SAYISI;
+  int ayni = 0;
+  for (int i = 0; i < n; i++)
+    for (int j = i + 1; j < n; j++) {
+      bool ayniAdet = BITKILER[i].otoSulamaAdet == BITKILER[j].otoSulamaAdet;
+      bool ayniSure = BITKILER[i].sulamaMs == BITKILER[j].sulamaMs;
+      bool ayniSaat = ayniAdet &&
+        BITKILER[i].otoSulama[0].saat == BITKILER[j].otoSulama[0].saat &&
+        BITKILER[i].otoSulama[0].dakika == BITKILER[j].otoSulama[0].dakika;
+      if (ayniAdet && ayniSure && ayniSaat) ayni++;
+    }
+  CHECK(ayni == 0);
+}
+TEST_CASE("bitkiler: sig kok sik+az, derin kok seyrek+bol") {
+  const BitkiParam& lettuce  = bitkiParam("lettuce");
+  const BitkiParam& cucumber = bitkiParam("cucumber");
+  const BitkiParam& tomato   = bitkiParam("tomato");
+  const BitkiParam& pepper   = bitkiParam("pepper");
+  CHECK(cucumber.otoSulamaAdet > tomato.otoSulamaAdet);   // salatalik daha sik
+  CHECK(lettuce.sulamaMs < tomato.sulamaMs);              // marul daha az su
+  CHECK(pepper.otoSulamaAdet == 1);                       // biber seyrek
+  CHECK(pepper.sulamaMs > lettuce.sulamaMs);              // ama daha bol
+}
+
 TEST_CASE("etkinParam: gece serin (t band -2)") {
   const BitkiParam& tomato = bitkiParam("tomato");
   EtkinParam gunduz = etkinParam(tomato, "vejetatif", "ilkbahar", false);

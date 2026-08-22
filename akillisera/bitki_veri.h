@@ -13,19 +13,26 @@ struct BitkiParam {
   int          sLo, sHi;        // toprak nem ideal bandı (%) — sLo altında sula
   int          lLo, lHi;        // ışık ideal bandı (%) — lLo altında LED
   SulamaZamani otoSulama[4];    // AUTO modda optimum sulama saatleri
-  int          otoSulamaAdet;
+  int          otoSulamaAdet;   // günlük sulama SIKLIĞI
+  uint32_t     sulamaMs;        // her sulamada pompa süresi = MİKTAR
 };
 
 // Bantlar web_ui PLANTS ile aynı.
+// Sulama saatleri/sıklığı/miktarı kök derinliği ve su talebine göre farklıdır:
+//  - Sığ köklü + yüksek talep (lettuce, spinach, cucumber) -> SIK ve AZ su
+//  - Derin köklü + kuraklığa dayanıklı (tomato, pepper)    -> SEYREK ve BOL su
+//  - Sabah sulama tercih edilir: yaprak gün içinde kurur, mantar riski düşer.
+//  - Akşam geç sulamadan kaçınılır (ıslak yaprak + serin gece = hastalık).
 static const BitkiParam BITKILER[] = {
-  {"custom",     18,28, 40,70, 40,80, 30,80, {{8,0}},               1},
-  {"tomato",     18,27, 50,70, 50,75, 60,90, {{8,0},{18,0}},        2},
-  {"lettuce",    10,20, 50,70, 60,80, 40,70, {{7,0},{12,0},{17,0}}, 3},
-  {"pepper",     20,30, 50,70, 50,70, 60,95, {{8,0}},               1},
-  {"cucumber",   20,28, 60,80, 60,85, 60,90, {{7,0},{13,0},{19,0}}, 3},
-  {"basil",      18,28, 40,60, 40,65, 55,90, {{8,0}},               1},
-  {"strawberry", 15,24, 50,70, 50,75, 55,90, {{8,0},{17,0}},        2},
-  {"spinach",    10,22, 50,70, 55,80, 40,70, {{7,0},{17,0}},        2},
+  // anahtar     t band  h band  s band  l band   sulama saatleri                      adet  süre
+  {"custom",     18,28,  40,70,  40,80,  30,80,  {{8,0}},                                1,  5000},
+  {"tomato",     18,27,  50,70,  50,75,  60,90,  {{7,0},{17,0}},                         2,  8000},
+  {"lettuce",    10,20,  50,70,  60,80,  40,70,  {{6,30},{11,0},{15,30}},                3,  4000},
+  {"pepper",     20,30,  50,70,  50,70,  60,95,  {{7,30}},                               1,  7000},
+  {"cucumber",   20,28,  60,80,  60,85,  60,90,  {{6,30},{10,30},{14,30},{18,0}},        4,  6000},
+  {"basil",      18,28,  40,60,  40,65,  55,90,  {{7,0}},                                1,  4000},
+  {"strawberry", 15,24,  50,70,  50,75,  55,90,  {{7,0},{16,0}},                         2,  5000},
+  {"spinach",    10,22,  50,70,  55,80,  40,70,  {{6,30},{16,30}},                       2,  4000},
 };
 constexpr int BITKI_SAYISI = sizeof(BITKILER) / sizeof(BITKILER[0]);
 
@@ -42,6 +49,7 @@ struct EtkinParam {
   float alarmHigh;                     // bu değerin üstü = tehlike alarmı
   const SulamaZamani* otoSulama;
   int   otoSulamaAdet;
+  uint32_t sulamaMs;                   // evre+mevsimle ölçeklenmiş sulama süresi
 };
 
 inline int biKirp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -70,5 +78,11 @@ inline EtkinParam etkinParam(const BitkiParam& bp, const char* evre, const char*
   e.alarmHigh = e.tHi + 4.0f;          // banttan 4C üstü = tehlike
   e.otoSulama = bp.otoSulama;
   e.otoSulamaAdet = bp.otoSulamaAdet;
+  // Miktar da evre/mevsime göre ölçeklenir (fide az, meyve/yaz çok su).
+  e.sulamaMs = sulamaSuresiOlcekle(bp.sulamaMs,
+                                   strcmp(evre, "fide") == 0,
+                                   strcmp(evre, "meyve") == 0,
+                                   strcmp(mevsim, "yaz") == 0,
+                                   strcmp(mevsim, "kis") == 0);
   return e;
 }

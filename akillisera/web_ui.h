@@ -234,13 +234,16 @@ function renderSulama(d){
   q('smodt').textContent=sulamaOto?'Auto':'Manual';
   q('sularow').className='row'+(sulamaOto?' disabled':'');
   q('addform').style.display=sulamaOto?'none':'flex';
-  q('schedttl').textContent=sulamaOto?'Optimal Times ('+aktifBitki().name+')':'Scheduled Watering';
+  var sn=d.sulamaSn||0;
+  q('schedttl').textContent=sulamaOto
+    ? 'Optimal Times ('+aktifBitki().name+') — '+(d.otoSulama||[]).length+'x/day, '+sn+'s each'
+    : 'Scheduled Watering';
   if(sulamaOto){
     var arr=d.otoSulama||[];planList=arr;var u=q('plan');u.innerHTML='';
     if(!arr.length){u.innerHTML='<li style="color:var(--mut);padding:6px 0">No auto times</li>';return;}
     arr.forEach(function(z){var li=document.createElement('li');li.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--ln)';
       var t=document.createElement('span');t.style.fontSize='18px';t.textContent=('0'+z.saat).slice(-2)+':'+('0'+z.dakika).slice(-2);
-      var b=document.createElement('span');b.className='val';b.textContent='auto';li.appendChild(t);li.appendChild(b);u.appendChild(li);});
+      var b=document.createElement('span');b.className='val';b.textContent=(d.sulamaSn||0)+'s';li.appendChild(t);li.appendChild(b);u.appendChild(li);});
   }else if(planTazele){planTazele=false;planCek();}   // yalnizca mod degisince cek
 }
 function fan(){if(fanOto)return;post('/api/fan',{acik:q('fan').getAttribute('aria-checked')!='true'});}
