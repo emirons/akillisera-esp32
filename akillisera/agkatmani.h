@@ -59,21 +59,29 @@ inline void corsBasliklari() {
   s_server.sendHeader(F("X-Content-Type-Options"), F("nosniff"));
   s_server.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
 }
+// JSON'u STATİK tampona yazıp gönderir. Her istekte String tahsis edilmesi
+// uzun çalışmada heap parçalanmasına yol açıyordu; tampon bir kez ayrılır.
+// Tampon yetmezse (truncation) geçersiz JSON yerine 500 döner.
+static char s_jsonBuf[1024];
+inline void jsonGonder(int kod, JsonDocument& doc) {
+  size_t n = serializeJson(doc, s_jsonBuf, sizeof(s_jsonBuf));
+  corsBasliklari();
+  if (n == 0 || n >= sizeof(s_jsonBuf) - 1) {
+    s_server.send(500, "application/json", "{\"hata\":\"yanit cok buyuk\"}");
+    return;
+  }
+  s_server.send(kod, "application/json", s_jsonBuf);
+}
+
 inline void jsonHata(int kod, const char* mesaj) {
   JsonDocument doc;
   doc["hata"] = mesaj;
-  String cikti;
-  serializeJson(doc, cikti);
-  corsBasliklari();
-  s_server.send(kod, F("application/json"), cikti);
+  jsonGonder(kod, doc);
 }
 inline void jsonOk(const char* mesaj) {
   JsonDocument doc;
   doc["sonuc"] = mesaj;
-  String cikti;
-  serializeJson(doc, cikti);
-  corsBasliklari();
-  s_server.send(200, F("application/json"), cikti);
+  jsonGonder(200, doc);
 }
 // POST gövdesini al + doğrula. Başarılıysa doc'a yazar ve true döner; değilse
 // uygun hata kodunu gönderip false döner (413 boyut, 400 ayrıştırma).
@@ -126,10 +134,7 @@ inline void handleDurum() {
   char sbuf[12]; zamanMetni(sbuf, sizeof(sbuf));
   doc["saat"]          = sbuf;
   doc["calismaSuresi"] = millis();
-  String cikti;
-  serializeJson(doc, cikti);
-  corsBasliklari();
-  s_server.send(200, F("application/json"), cikti);
+  jsonGonder(200, doc);
 }
 
 // GET /api/plan -> zamanlı sulama listesi
@@ -142,10 +147,7 @@ inline void handlePlan() {
     o["saat"] = z.saat;
     o["dakika"] = z.dakika;
   }
-  String cikti;
-  serializeJson(doc, cikti);
-  corsBasliklari();
-  s_server.send(200, F("application/json"), cikti);
+  jsonGonder(200, doc);
 }
 
 // POST /api/plan {saat,dakika} -> ekle
@@ -179,9 +181,7 @@ inline void handleBitki() {
     doc["bitki"]  = bitkiAl();
     doc["evre"]   = evreAl();
     doc["mevsim"] = mevsimAl();
-    String cikti; serializeJson(doc, cikti);
-    corsBasliklari();
-    s_server.send(200, F("application/json"), cikti);
+    jsonGonder(200, doc);
   }
 }
 
@@ -239,10 +239,7 @@ inline void handleSaglik() {
   doc["rssi"]              = WiFi.RSSI();
   doc["dhtHata"]           = kdDurum().dhtHata;
   doc["agDurumu"]          = agBagli() ? "BAGLI" : "OTONOM";
-  String cikti;
-  serializeJson(doc, cikti);
-  corsBasliklari();
-  s_server.send(200, F("application/json"), cikti);
+  jsonGonder(200, doc);
 }
 
 inline void handleNotFound() {

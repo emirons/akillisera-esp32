@@ -13,6 +13,7 @@ static LiquidCrystal_I2C s_lcd(LCD_I2C_ADDR, 16, 2);
 static Sayfa s_sayfa = Sayfa::IKLIM;
 static unsigned long s_sonYenileme = 0;
 static char s_onceki[2][17] = {{0}, {0}};   // son yazılan satırlar (değişince yaz)
+static unsigned long s_mesajBitis = 0;      // geçici bildirim kilidi (bkz. ekranMesaji)
 
 inline void ekraniBaslat() {
   s_lcd.init();
@@ -43,6 +44,11 @@ inline void satiriYaz(uint8_t row, const char* padli16) {
 
 // LCD_REFRESH_INTERVAL (500 ms) periyodunda çağrılır.
 inline void ekraniGuncelle(const EkranVerisi& d, unsigned long simdi) {
+  // Geçici bildirim (ekranMesaji) gösterimdeyse üzerine yazma — mesaj süresi dolsun.
+  if (s_mesajBitis != 0) {
+    if ((long)(simdi - s_mesajBitis) < 0) return;
+    s_mesajBitis = 0;
+  }
   if (simdi - s_sonYenileme < LCD_REFRESH_INTERVAL) return;
   s_sonYenileme = simdi;
   char l1[17], l2[17];
@@ -51,8 +57,10 @@ inline void ekraniGuncelle(const EkranVerisi& d, unsigned long simdi) {
   satiriYaz(1, l2);
 }
 
-// Geçici bildirim (örn. "SULA" / "Komut alindi").
+// Geçici bildirim (örn. uzaktan gelen komut). MESAJ_SURESI boyunca periyodik
+// güncelleme bastırılır, aksi halde mesaj 500 ms içinde silinirdi.
 inline void ekranMesaji(const char* satir1, const char* satir2) {
+  s_mesajBitis = millis() + LCD_MESAJ_SURESI;
   char l1[17], l2[17];
   pad16(satir1, l1);
   pad16(satir2, l2);
