@@ -54,6 +54,7 @@ constexpr unsigned long CLOUD_INTERVAL        = 30000UL;  // ThingSpeak — API 
 constexpr unsigned long TALKBACK_INTERVAL     = 30000UL;  // TalkBack — API bütçesi, DÜŞÜRME
 constexpr unsigned long BUTTON_DEBOUNCE_MS    = 50UL;
 constexpr unsigned long ALARM_BLINK_MS        = 500UL;   // alarm buzzer/LED yanıp sönme periyodu
+constexpr unsigned long LCD_MESAJ_SURESI      = 2000UL;  // geçici LCD bildirimi ekranda kalma süresi
 
 // ============================================================================
 // LEDC PWM PARAMETRELERİ (şerit LED)

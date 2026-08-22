@@ -183,7 +183,7 @@ canvas{width:100%;height:180px;display:block}
 <script>
 // Fan and LED are INDEPENDENT (each has its own auto/manual). Slider posts only
 // on release (change), never while dragging, so the ESP32 isn't flooded.
-var fanOto=true, ledOto=true, sulamaOto=true, hataSay=0;
+var fanOto=true, ledOto=true, sulamaOto=true, hataSay=0, planTazele=true;
 var hist={t:[],h:[],s:[]}, HMAX=60;
 var acc={n:0,fan:0,led:0,pump:0}, planList=[], bitki='custom';
 // Bitki bilgi tabanı — bahçecilik referanslarından derlenmiş ideal aralıklar +
@@ -228,6 +228,7 @@ function smod(){post('/api/mod',{sulama:!sulamaOto});}
 // Sulama modu görünümü: OTO -> WATER+ekleme soluk, plan = bitki optimum saatleri
 // (salt-okunur). MANUEL -> WATER+ekleme aktif, plan = kullanıcı planı.
 function renderSulama(d){
+  if(sulamaOto!==d.sulamaOto)planTazele=true;   // mod degisti -> plani bir kez tazele
   sulamaOto=d.sulamaOto;
   q('smod').setAttribute('aria-checked',sulamaOto?'false':'true');
   q('smodt').textContent=sulamaOto?'Auto':'Manual';
@@ -240,7 +241,7 @@ function renderSulama(d){
     arr.forEach(function(z){var li=document.createElement('li');li.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--ln)';
       var t=document.createElement('span');t.style.fontSize='18px';t.textContent=('0'+z.saat).slice(-2)+':'+('0'+z.dakika).slice(-2);
       var b=document.createElement('span');b.className='val';b.textContent='auto';li.appendChild(t);li.appendChild(b);u.appendChild(li);});
-  }else{planCek();}
+  }else if(planTazele){planTazele=false;planCek();}   // yalnizca mod degisince cek
 }
 function fan(){if(fanOto)return;post('/api/fan',{acik:q('fan').getAttribute('aria-checked')!='true'});}
 function ledGonder(v){if(ledOto)return;post('/api/led',{parlaklik:parseInt(v)});}

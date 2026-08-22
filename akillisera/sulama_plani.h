@@ -20,8 +20,24 @@ inline void planYukle() {
   s_planAdet = s_pref.getInt("adet", 0);
   if (s_planAdet < 0) s_planAdet = 0;
   if (s_planAdet > MAKS_SULAMA_ZAMANI) s_planAdet = MAKS_SULAMA_ZAMANI;
-  s_pref.getBytes("plan", s_plan, s_planAdet * sizeof(SulamaZamani));
+  size_t beklenen = (size_t)s_planAdet * sizeof(SulamaZamani);
+  size_t okunan   = s_pref.getBytes("plan", s_plan, beklenen);
   s_pref.end();
+
+  // NVS bozulmuş/eksikse dizi sıfır kalır ve her girdi 00:00 olur -> gece yarısı
+  // hayalet sulama tetiklenirdi. Eksik okuma veya geçersiz saat varsa planı boşalt.
+  if (s_planAdet > 0 && okunan != beklenen) {
+    Serial.println(F("Sulama plani bozuk (eksik NVS verisi) - plan sifirlandi"));
+    s_planAdet = 0;
+    return;
+  }
+  for (int i = 0; i < s_planAdet; i++) {
+    if (!zamanGecerliMi(s_plan[i].saat, s_plan[i].dakika)) {
+      Serial.println(F("Sulama planinda gecersiz saat - plan sifirlandi"));
+      s_planAdet = 0;
+      return;
+    }
+  }
 }
 
 inline void planKaydet() {
